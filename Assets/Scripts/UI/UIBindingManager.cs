@@ -68,6 +68,9 @@ namespace SkullKing.UI
         [Tooltip("카드 프리팹 (회원님이 제작)")]
         [SerializeField] private GameObject _cardPrefab;
 
+        [Tooltip("카드 일러스트 데이터베이스 (Assets > Create > SkullKing > Card Sprite Database)")]
+        [SerializeField] private CardSpriteDatabase _spriteDatabase;
+
         [Header("=== 스코어보드 ===")]
         [Tooltip("각 플레이어의 점수/비딩 정보를 표시할 텍스트 배열 (최대 6명)")]
         [SerializeField] private Text[] _playerInfoTexts;
@@ -100,6 +103,7 @@ namespace SkullKing.UI
         private List<CardData> _currentPlayableCards = new List<CardData>();
         private List<GameObject> _handCardObjects = new List<GameObject>();
         private List<GameObject> _trickCardObjects = new List<GameObject>();
+        private bool _trickCardsDirty = false;
 
         // ============================================================
         // 초기화
@@ -121,6 +125,28 @@ namespace SkullKing.UI
             if (_roundResultText != null)
             {
                 _roundResultText.alignment = TextAnchor.MiddleCenter;
+            }
+
+            // 영역의 Layout 컴포넌트 제거 (수동 배치 사용)
+            DestroyAreaLayoutComponents(_trickArea);
+            DestroyAreaLayoutComponents(_playerHandArea);
+        }
+
+        /// <summary>
+        /// 매 프레임 트릭 카드 위치를 강제 적용합니다.
+        /// Unity 레이아웃 시스템보다 늦게 실행되어 위치를 확실히 보장합니다.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (_trickCardObjects.Count > 0)
+            {
+                RepositionTrickCards();
+            }
+
+            // 손패 카드도 매 프레임 위치 강제 — Unity 레이아웃 시스템 간섭 완전 차단
+            if (_handCardObjects.Count > 0)
+            {
+                RepositionHandCards();
             }
         }
 
@@ -405,6 +431,8 @@ namespace SkullKing.UI
             _gameManager.SubmitHumanCard(card);
         }
 
+
+
         // ============================================================
         // UI 갱신 메서드
         // ============================================================
@@ -513,16 +541,33 @@ namespace SkullKing.UI
                 var cardObj = Instantiate(_cardPrefab, _playerHandArea);
                 cardObj.transform.localScale = Vector3.one;
 
+                // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
+                var layoutElem = cardObj.GetComponent<LayoutElement>();
+                if (layoutElem != null) DestroyImmediate(layoutElem);
+
                 // CardUI 컴포넌트가 있으면 데이터 설정
                 var cardUI = cardObj.GetComponent<CardUI>();
                 if (cardUI != null)
                 {
                     bool isPlayable = IsCardPlayable(card);
                     cardUI.Setup(card, isPlayable, this);
+
+                    // 일러스트 자동 적용
+                    if (_spriteDatabase != null)
+                    {
+                        var sprite = _spriteDatabase.GetSpriteForCard(card);
+                        cardUI.SetIllustration(sprite);
+                    }
+
+                    // 손패 호버 효과 활성화 (자신의 인덱스 전달)
+                    cardUI.SetAsHandCard(Vector3.one, i);
                 }
 
                 _handCardObjects.Add(cardObj);
             }
+
+            // 즉시 배치 (LateUpdate에서도 매 프레임 강제 적용됨)
+            RepositionHandCards();
         }
 
         private void ClearHandArea()
@@ -550,7 +595,11 @@ namespace SkullKing.UI
             if (_cardPrefab == null || _trickArea == null) return;
 
             var cardObj = Instantiate(_cardPrefab, _trickArea);
-            cardObj.transform.localScale = Vector3.one;
+            cardObj.transform.localScale = Vector3.one * 0.85f;
+
+            // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
+            var layoutElem = cardObj.GetComponent<LayoutElement>();
+            if (layoutElem != null) DestroyImmediate(layoutElem);
 
             var cardUI = cardObj.GetComponent<CardUI>();
             if (cardUI != null)
@@ -558,9 +607,175 @@ namespace SkullKing.UI
                 cardUI.Setup(playedCard.Card, false, this);
                 // 누가 냈는지 라벨 표시
                 cardUI.SetOwnerLabel(_gameManager.State.Players[playedCard.PlayerIndex].Name);
+
+                // 타이그리스 모드 표시 (모든 플레이어가 용사/항복 선택을 볼 수 있도록)
+                if (playedCard.Card.Special == SpecialType.Tigress)
+                {
+                    cardUI.SetTigressMode(playedCard.TigressMode);
+                }
+
+                // 일러스트 자동 적용
+                if (_spriteDatabase != null)
+                {
+                    var sprite = _spriteDatabase.GetSpriteForCard(playedCard.Card);
+                    cardUI.SetIllustration(sprite);
+                }
             }
 
             _trickCardObjects.Add(cardObj);
+
+            // 기존 카드는 새 카드가 추가됨에 따라 위치 재계산
+            RepositionTrickCards();
+
+            // 새로 추가된 카드는 애니메이션으로 등장
+            if (cardUI != null)
+            {
+                int idx = _trickCardObjects.Count - 1;
+                float cw = 120f * 0.85f;
+                float sp = 15f;
+                int cnt = _trickCardObjects.Count;
+                float tw = cnt * cw + (cnt - 1) * sp;
+                float sx = -tw / 2f + cw / 2f;
+                Vector2 targetPos = new Vector2(sx + idx * (cw + sp), 0f);
+
+                // 플레이어 슬롯 위치에 따른 방향 벡터
+                Vector2 startOffset = GetCardEntryOffset(playedCard.PlayerIndex);
+
+                cardUI.PlayEntryAnimation(targetPos, Vector3.one * 0.85f, startOffset);
+            }
+
+            _trickCardsDirty = true;
+        }
+
+        /// <summary>
+        /// 플레이어 인덱스에 해당하는 패널 위치에서 트릭 영역 방향으로의 시작 오프셋을 반환합니다.
+        /// 각 슬롯 위치:
+        ///   0: Bottom (아래), 1: Left (왼쪽), 2: TopLeft (왼쪽위),
+        ///   3: Top (위), 4: TopRight (오른쪽위), 5: Right (오른쪽)
+        /// </summary>
+        private Vector2 GetCardEntryOffset(int playerIndex)
+        {
+            int playerCount = _gameManager.State.Players.Length;
+
+            // UpdateScoreboard과 동일한 슬롯 매핑
+            int[] mapping;
+            if (playerCount == 6) mapping = new int[] { 0, 1, 2, 3, 4, 5 };
+            else if (playerCount == 5) mapping = new int[] { 0, 1, 2, 4, 5 };
+            else if (playerCount == 4) mapping = new int[] { 0, 1, 3, 5 };
+            else if (playerCount == 3) mapping = new int[] { 0, 1, 5 };
+            else mapping = new int[] { 0, 3 };  // 2인
+
+            int slot = (playerIndex < mapping.Length) ? mapping[playerIndex] : 3;
+
+            // 슬롯별 방향 벡터 (트릭 영역 중앙 기준)
+            switch (slot)
+            {
+                case 0: return new Vector2(0, -250f);       // Bottom → 아래에서 올라옴
+                case 1: return new Vector2(-350f, 0);       // Left → 왼쪽에서
+                case 2: return new Vector2(-250f, 200f);    // TopLeft → 왼쪽 위에서
+                case 3: return new Vector2(0, 250f);        // Top → 위에서
+                case 4: return new Vector2(250f, 200f);     // TopRight → 오른쪽 위에서
+                case 5: return new Vector2(350f, 0);        // Right → 오른쪽에서
+                default: return new Vector2(0, 200f);
+            }
+        }
+
+        /// <summary>
+        /// 지정된 영역의 모든 Layout 관련 컴포넌트를 제거합니다.
+        /// enabled=false로 즉시 비활성화 + Destroy로 완전 제거를 병행합니다.
+        /// </summary>
+        private void DestroyAreaLayoutComponents(Transform area)
+        {
+            if (area == null) return;
+
+            // 모든 레이아웃 그룹 타입 처리 (DestroyImmediate로 즉시 제거)
+            var hlg = area.GetComponent<HorizontalLayoutGroup>();
+            if (hlg != null) { hlg.enabled = false; DestroyImmediate(hlg); }
+
+            var vlg = area.GetComponent<VerticalLayoutGroup>();
+            if (vlg != null) { vlg.enabled = false; DestroyImmediate(vlg); }
+
+            var glg = area.GetComponent<GridLayoutGroup>();
+            if (glg != null) { glg.enabled = false; DestroyImmediate(glg); }
+
+            var csf = area.GetComponent<ContentSizeFitter>();
+            if (csf != null) { csf.enabled = false; DestroyImmediate(csf); }
+        }
+
+        /// <summary>
+        /// 손패 영역의 카드를 부채꼴/가로 일렬 형태로 수동 배치합니다.
+        /// </summary>
+        private void RepositionHandCards()
+        {
+            int count = _handCardObjects.Count;
+            if (count == 0) return;
+
+            float cardWidth = 120f;  // 카드 기본 폭
+            float overlap = -20f;    // 격치는 정도 (UNO 스타일)
+            float totalWidth = count * cardWidth + (count - 1) * overlap;
+            float startX = -totalWidth / 2f + cardWidth / 2f;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (_handCardObjects[i] == null) continue;
+
+                // 호버 중인 카드는 건너뛰 — 호버 효과와 충돌 방지
+                var cardUI = _handCardObjects[i].GetComponent<CardUI>();
+                if (cardUI != null && cardUI.IsHovered) continue;
+
+                var rt = _handCardObjects[i].GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    // 앵커를 정중앙으로 맞추고 수동 배치
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.sizeDelta = new Vector2(120f, 170f);
+                    
+                    float xPos = startX + i * (cardWidth + overlap);
+                    rt.anchoredPosition = new Vector2(xPos, 0);
+                }
+
+                // 원본 위치 캐시 (호버 복원용)
+                if (cardUI != null)
+                {
+                    cardUI.CaptureOriginalPosition();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 트릭 영역의 모든 카드를 가로 일렬로 배치합니다.
+        /// anchoredPosition을 직접 계산합니다.
+        /// </summary>
+        private void RepositionTrickCards()
+        {
+            int count = _trickCardObjects.Count;
+            if (count == 0) return;
+
+            float cardWidth = 120f * 0.85f;  // 카드 폭 × 스케일
+            float spacing = 15f;
+            float totalWidth = count * cardWidth + (count - 1) * spacing;
+            float startX = -totalWidth / 2f + cardWidth / 2f;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (_trickCardObjects[i] == null) continue;
+
+                // 등장 애니메이션 중인 카드는 스킵 — 애니메이션이 위치를 직접 제어
+                var cardUI = _trickCardObjects[i].GetComponent<CardUI>();
+                if (cardUI != null && cardUI.IsAnimating) continue;
+
+                var rt = _trickCardObjects[i].GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.sizeDelta = new Vector2(120f, 170f);
+                    rt.anchoredPosition = new Vector2(startX + i * (cardWidth + spacing), 0f);
+                }
+            }
         }
 
         private bool IsCardPlayable(CardData card)

@@ -57,15 +57,16 @@ namespace SkullKing.Logic
                 _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Escape));
             }
 
-            // ---- 해적 카드 (5장) ----
+            // ---- 용사 카드 (5장) — 각각 고유 직업명 ----
+            string[] heroNames = { "전사", "마법사", "궁수", "도적", "성기사" };
             for (int i = 0; i < 5; i++)
             {
-                _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Pirate));
+                _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Pirate, heroNames[i]));
             }
 
-            // ---- 인어 카드 (2장) ----
-            _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Mermaid));
-            _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Mermaid));
+            // ---- 정령 카드 (2장) — 각각 고유 속성명 ----
+            _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Mermaid, "화염 정령"));
+            _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Mermaid, "빙결 정령"));
 
             // ---- 타이그리스 (1장) ----
             _cards.Add(CardData.CreateSpecialCard(id++, SpecialType.Tigress));

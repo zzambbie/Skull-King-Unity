@@ -451,13 +451,7 @@ namespace SkullKing.Editor
             trickRect.anchorMax = new Vector2(0.72f, 0.62f);
             trickRect.offsetMin = Vector2.zero;
             trickRect.offsetMax = Vector2.zero;
-            var trickLayout = trickArea.AddComponent<HorizontalLayoutGroup>();
-            trickLayout.spacing = 10;
-            trickLayout.childAlignment = TextAnchor.MiddleCenter;
-            trickLayout.childForceExpandWidth = false;
-            trickLayout.childForceExpandHeight = false;
-            trickLayout.childControlWidth = false;
-            trickLayout.childControlHeight = false;
+            // LayoutGroup 없음 — UIBindingManager가 코드로 카드 위치를 직접 계산
 
             // 트릭 결과 텍스트 (트릭 영역 위)
             var trickResultObj = CreateUIChild(canvasObj, "TrickResultText", Vector2.zero);

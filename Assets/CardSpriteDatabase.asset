@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c081920eb24e2474598b222963a97ad3, type: 3}
+  m_Name: CardSpriteDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::SkullKing.Data.CardSpriteDatabase
+  greenSuitSprite: {fileID: 21300000, guid: 16074a3069f2f30419897240c4cdcec1, type: 3}
+  yellowSuitSprite: {fileID: 21300000, guid: 3f9fd726a4aa8fd46be9e586c332ab39, type: 3}
+  purpleSuitSprite: {fileID: 21300000, guid: d595c14ada38dcb498d0e1509d5ed248, type: 3}
+  blackSuitSprite: {fileID: 21300000, guid: 35c8191e78601bb4ab9a5eddd52ee080, type: 3}
+  pirate1Sprite: {fileID: 0}
+  pirate2Sprite: {fileID: 0}
+  pirate3Sprite: {fileID: 0}
+  pirate4Sprite: {fileID: 0}
+  pirate5Sprite: {fileID: 0}
+  mermaid1Sprite: {fileID: 0}
+  mermaid2Sprite: {fileID: 0}
+  skullKingSprite: {fileID: 0}
+  tigressSprite: {fileID: 0}
+  krakenSprite: {fileID: 0}
+  whiteWhaleSprite: {fileID: 0}
+  escapeSprite: {fileID: 0}
+  jewelSprite: {fileID: 0}
+  cardBackSprite: {fileID: 0}

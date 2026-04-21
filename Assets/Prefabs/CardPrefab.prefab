@@ -476,6 +476,7 @@ GameObject:
   - component: {fileID: 3460640243185840856}
   - component: {fileID: 7151025384733077069}
   - component: {fileID: 1809520375647961464}
+  - component: {fileID: 3004313979145530946}
   m_Layer: 0
   m_Name: CardPrefab
   m_TagString: Untagged
@@ -629,3 +630,19 @@ MonoBehaviour:
   _ownerLabel: {fileID: 9001922114293214149}
   _disabledOverlay: {fileID: 5907129018540232105}
   _button: {fileID: 7151025384733077069}
+--- !u!114 &3004313979145530946
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6205507386424526056}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e71e8e2153c1e694888997c2998f6fee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardTiltEffect
+  _maxTiltAngle: 15
+  _tiltSpeed: 8
+  _hoverScale: 1.15
+  _hoverLiftY: 30

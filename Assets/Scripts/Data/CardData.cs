@@ -86,10 +86,10 @@ namespace SkullKing.Data
         {
             string suitName = suit switch
             {
-                CardSuit.Green => "초록",
-                CardSuit.Yellow => "노랑",
-                CardSuit.Purple => "보라",
-                CardSuit.Black => "검정",
+                CardSuit.Green => "활",       // 🏹 레인저 — 숲의 초록
+                CardSuit.Yellow => "검",      // ⚔️ 나이트 — 황금 빛
+                CardSuit.Purple => "지팡이",  // 🔮 메이지 — 신비 보라
+                CardSuit.Black => "흑마도서", // 📖 다크메이지 — 먹빛
                 _ => "?"
             };
             return new CardData
