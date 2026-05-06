@@ -70,8 +70,10 @@ namespace SkullKing.UI
         private bool _isInHand = false;        // 손패 카드인지 여부
         private Vector3 _originalScale;
         private Vector2 _originalAnchoredPos;  // 절대 원본 위치 (anchoredPosition)
+        private float _originalRotationZ;      // 원본 Z 회전값 (부채꼴 배치용)
         private bool _hasOriginalPos = false;  // 원본 위치가 설정되었는지
         private bool _isHovered = false;
+        private float _hoverYOffset = 40f;     // 호버 시 위로 올라가는 픽셀
         /// <summary>현재 호버 중인지 여부 (외부 읽기용)</summary>
         public bool IsHovered => _isHovered;
         /// <summary>카드 데이터 (외부 읽기용)</summary>
@@ -215,7 +217,15 @@ namespace SkullKing.UI
             Color frameColor = GetFrameColor(card);
             Color bannerColor = GetBannerColor(card);
 
-            // 프레임 (새 레이아웃)
+            // ★ 루트 Image 색상 직접 설정 (테두리 색상)
+            // _frameImage가 프리팹에서 연결 안 되어 있어도 루트 Image를 직접 찾아서 적용
+            var rootImage = GetComponent<Image>();
+            if (rootImage != null)
+            {
+                rootImage.color = frameColor;
+            }
+
+            // 프레임 (Inspector에서 연결된 경우)
             if (_frameImage != null)
             {
                 _frameImage.color = frameColor;
@@ -351,6 +361,7 @@ namespace SkullKing.UI
             if (rt != null)
             {
                 _originalAnchoredPos = rt.anchoredPosition;
+                _originalRotationZ = rt.localEulerAngles.z;
                 _hasOriginalPos = true;
             }
         }
@@ -358,14 +369,23 @@ namespace SkullKing.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (!_isInHand) return;
+
+            // 보류 중인 지연 퇴장을 취소 (경계선 깜빡임 방지)
+            if (_exitDelayCoroutine != null)
+            {
+                StopCoroutine(_exitDelayCoroutine);
+                _exitDelayCoroutine = null;
+            }
+
             if (_isHovered) return;
             _isHovered = true;
 
-            // 원본 위치 캡처 (강제 고정용)
+            // 원본 위치/회전 캡처 (강제 고정용)
             var rt = GetComponent<RectTransform>();
             if (rt != null)
             {
                 _originalAnchoredPos = rt.anchoredPosition;
+                _originalRotationZ = rt.localEulerAngles.z;
                 _hasOriginalPos = true;
             }
 
@@ -374,6 +394,7 @@ namespace SkullKing.UI
             {
                 StopAllCoroutines();
                 _isExitAnimating = false;
+                _exitDelayCoroutine = null;
             }
 
             // 다른 카드 위에 렌더링 (Update()에서 위치 강제 고정하므로 안전)
@@ -382,8 +403,12 @@ namespace SkullKing.UI
             // 부드러운 확대 애니메이션 시작
             _hoverScaleCoroutine = StartCoroutine(AnimateHoverScale());
 
-            // 위치 즉시 고정
-            if (rt != null) rt.anchoredPosition = _originalAnchoredPos;
+            // 위치를 위로 올리고 회전을 0으로 (부채꼴에서 똑바로)
+            if (rt != null)
+            {
+                rt.anchoredPosition = _originalAnchoredPos + new Vector2(0, _hoverYOffset);
+                rt.localEulerAngles = Vector3.zero;
+            }
 
             // 프레임 하이라이트
             if (_frameImage != null)
@@ -394,7 +419,8 @@ namespace SkullKing.UI
         }
 
         private Coroutine _hoverScaleCoroutine;
-        private bool _isExitAnimating = false;  // 축소 애니메이션 중 여부
+        private Coroutine _exitDelayCoroutine;   // 지연 퇴장 코루틴 (깜빡임 방지)
+        private bool _isExitAnimating = false;    // 축소 애니메이션 중 여부
 
         /// <summary>
         /// 호버 시 부드러운 확대 애니메이션 (ease-out back, 0.3초)
@@ -426,6 +452,19 @@ namespace SkullKing.UI
         public void OnPointerExit(PointerEventData eventData)
         {
             if (!_isInHand) return;
+            // 즉시 퇴장하지 않고 짧은 지연을 둬서 경계선 깜빡임을 방지
+            if (_exitDelayCoroutine != null) StopCoroutine(_exitDelayCoroutine);
+            _exitDelayCoroutine = StartCoroutine(DelayedExitHover());
+        }
+
+        /// <summary>
+        /// 짧은 지연 후 호버 해제. 카드가 위로 이동하면서 마우스가 경계선을
+        /// 벗어났다 다시 들어오는 깜빡임 현상을 방지합니다.
+        /// </summary>
+        private IEnumerator DelayedExitHover()
+        {
+            yield return new WaitForSeconds(0.06f);
+            _exitDelayCoroutine = null;
             ExitHover();
         }
 
@@ -442,13 +481,14 @@ namespace SkullKing.UI
 
             if (!_isInHand || !_isHovered) return;
 
-            // 매 프레임 위치 강제 고정
+            // 매 프레임 위치 + 회전 강제 고정 (호버 상태: 위로 올라감 + 회전 0)
             if (_hasOriginalPos)
             {
                 var rt = GetComponent<RectTransform>();
                 if (rt != null)
                 {
-                    rt.anchoredPosition = _originalAnchoredPos;
+                    rt.anchoredPosition = _originalAnchoredPos + new Vector2(0, _hoverYOffset);
+                    rt.localEulerAngles = Vector3.zero;
                 }
             }
 
@@ -495,6 +535,12 @@ namespace SkullKing.UI
             float elapsed = 0f;
             Vector3 startScale = transform.localScale;
             Vector3 targetScale = _originalScale;
+            Vector3 startRotation = transform.localEulerAngles;
+            Vector3 targetRotation = new Vector3(0, 0, _originalRotationZ);
+
+            // 현재 호버 위치에서 시작
+            var rt = GetComponent<RectTransform>();
+            Vector2 startPos = rt != null ? rt.anchoredPosition : _originalAnchoredPos;
 
             while (elapsed < duration)
             {
@@ -503,21 +549,22 @@ namespace SkullKing.UI
                 float ease = 1f - Mathf.Pow(1f - t, 3f);
                 transform.localScale = Vector3.Lerp(startScale, targetScale, ease);
 
-                if (_hasOriginalPos)
+                if (_hasOriginalPos && rt != null)
                 {
-                    var rt = GetComponent<RectTransform>();
-                    if (rt != null) rt.anchoredPosition = _originalAnchoredPos;
+                    rt.anchoredPosition = Vector2.Lerp(startPos, _originalAnchoredPos, ease);
+                    // 회전도 부드럽게 복원
+                    transform.localEulerAngles = Vector3.Lerp(startRotation, targetRotation, ease);
                 }
 
                 yield return null;
             }
 
             transform.localScale = targetScale;
+            transform.localEulerAngles = targetRotation;
 
-            if (_hasOriginalPos)
+            if (_hasOriginalPos && rt != null)
             {
-                var rt = GetComponent<RectTransform>();
-                if (rt != null) rt.anchoredPosition = _originalAnchoredPos;
+                rt.anchoredPosition = _originalAnchoredPos;
             }
 
             _isExitAnimating = false;

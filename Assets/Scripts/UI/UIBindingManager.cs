@@ -106,6 +106,14 @@ namespace SkullKing.UI
         private bool _trickCardsDirty = false;
 
         // ============================================================
+        // 프론트뷰 동적 UI 요소
+        // ============================================================
+
+        private PlayerProfilePanel[] _profilePanels;
+        private OpponentHandDisplay[] _opponentDisplays;
+        private bool _frontViewInitialized = false;
+
+        // ============================================================
         // 초기화
         // ============================================================
 
@@ -226,8 +234,17 @@ namespace SkullKing.UI
 
         private void HandleCardsDealt()
         {
+            // 프론트뷰 초기화 (첫 라운드에서만)
+            if (!_frontViewInitialized)
+            {
+                SetupFrontViewLayout();
+            }
+
             // 인간 플레이어의 손패를 UI에 표시
             RefreshPlayerHand();
+
+            // 상대 플레이어 카드 수 갱신
+            RefreshOpponentHands();
         }
 
         private void HandleBidRequested(PlayerData player, int maxBid)
@@ -286,6 +303,8 @@ namespace SkullKing.UI
                 RefreshPlayerHand();
             }
 
+            // 상대 카드 수 갱신
+            RefreshOpponentHands();
             UpdateScoreboard();
         }
 
@@ -510,6 +529,9 @@ namespace SkullKing.UI
                 if (_playerInfoTexts[i] != null)
                     _playerInfoTexts[i].text = "";
             }
+
+            // ---- 프론트뷰 프로필 패널 갱신 ----
+            UpdateProfilePanels();
         }
 
         /// <summary>
@@ -539,7 +561,7 @@ namespace SkullKing.UI
             {
                 var card = human.Hand[i];
                 var cardObj = Instantiate(_cardPrefab, _playerHandArea);
-                cardObj.transform.localScale = Vector3.one;
+                cardObj.transform.localScale = Vector3.one * 1.1f;
 
                 // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
                 var layoutElem = cardObj.GetComponent<LayoutElement>();
@@ -559,8 +581,8 @@ namespace SkullKing.UI
                         cardUI.SetIllustration(sprite);
                     }
 
-                    // 손패 호버 효과 활성화 (자신의 인덱스 전달)
-                    cardUI.SetAsHandCard(Vector3.one, i);
+                    // 손패 호버 효과 활성화 (실제 스케일과 일치시킴)
+                    cardUI.SetAsHandCard(Vector3.one * 1.1f, i);
                 }
 
                 _handCardObjects.Add(cardObj);
@@ -595,7 +617,7 @@ namespace SkullKing.UI
             if (_cardPrefab == null || _trickArea == null) return;
 
             var cardObj = Instantiate(_cardPrefab, _trickArea);
-            cardObj.transform.localScale = Vector3.one * 0.85f;
+            cardObj.transform.localScale = Vector3.one * 0.75f;
 
             // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
             var layoutElem = cardObj.GetComponent<LayoutElement>();
@@ -627,21 +649,12 @@ namespace SkullKing.UI
             // 기존 카드는 새 카드가 추가됨에 따라 위치 재계산
             RepositionTrickCards();
 
-            // 새로 추가된 카드는 애니메이션으로 등장
+            // 새로 추가된 카드는 애니메이션으로 등장 (방사형 위치)
             if (cardUI != null)
             {
-                int idx = _trickCardObjects.Count - 1;
-                float cw = 120f * 0.85f;
-                float sp = 15f;
-                int cnt = _trickCardObjects.Count;
-                float tw = cnt * cw + (cnt - 1) * sp;
-                float sx = -tw / 2f + cw / 2f;
-                Vector2 targetPos = new Vector2(sx + idx * (cw + sp), 0f);
-
-                // 플레이어 슬롯 위치에 따른 방향 벡터
+                Vector2 targetPos = GetTrickCardPosition(playedCard.PlayerIndex);
                 Vector2 startOffset = GetCardEntryOffset(playedCard.PlayerIndex);
-
-                cardUI.PlayEntryAnimation(targetPos, Vector3.one * 0.85f, startOffset);
+                cardUI.PlayEntryAnimation(targetPos, Vector3.one * 0.75f, startOffset);
             }
 
             _trickCardsDirty = true;
@@ -702,16 +715,22 @@ namespace SkullKing.UI
             if (csf != null) { csf.enabled = false; DestroyImmediate(csf); }
         }
 
+        // ============================================================
+        // 손패 배치 — 프론트뷰 스타일 (3D 원근감은 부모 X회전으로 처리)
+        // ============================================================
+
         /// <summary>
-        /// 손패 영역의 카드를 부채꼴/가로 일렬 형태로 수동 배치합니다.
+        /// 손패 영역의 카드를 정갈한 가로 배치합니다.
+        /// 부모 Transform의 X축 회전이 3D 원근감을 처리합니다.
         /// </summary>
         private void RepositionHandCards()
         {
             int count = _handCardObjects.Count;
             if (count == 0) return;
 
-            float cardWidth = 120f;  // 카드 기본 폭
-            float overlap = -20f;    // 격치는 정도 (UNO 스타일)
+            float cardWidth = 140f;
+            float cardHeight = 200f;
+            float overlap = -15f; // 카드 격치는 정도
             float totalWidth = count * cardWidth + (count - 1) * overlap;
             float startX = -totalWidth / 2f + cardWidth / 2f;
 
@@ -724,17 +743,14 @@ namespace SkullKing.UI
                 if (cardUI != null && cardUI.IsHovered) continue;
 
                 var rt = _handCardObjects[i].GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    // 앵커를 정중앙으로 맞추고 수동 배치
-                    rt.anchorMin = new Vector2(0.5f, 0.5f);
-                    rt.anchorMax = new Vector2(0.5f, 0.5f);
-                    rt.pivot = new Vector2(0.5f, 0.5f);
-                    rt.sizeDelta = new Vector2(120f, 170f);
-                    
-                    float xPos = startX + i * (cardWidth + overlap);
-                    rt.anchoredPosition = new Vector2(xPos, 0);
-                }
+                if (rt == null) continue;
+
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(cardWidth, cardHeight);
+                rt.anchoredPosition = new Vector2(startX + i * (cardWidth + overlap), 0);
+                rt.localEulerAngles = Vector3.zero; // 개별 카드는 회전 없음 (부모 X회전이 3D 처리)
 
                 // 원본 위치 캐시 (호버 복원용)
                 if (cardUI != null)
@@ -744,38 +760,96 @@ namespace SkullKing.UI
             }
         }
 
+        // ============================================================
+        // 트릭 영역 방사형 배치 — 플레이어 위치 기반
+        // ============================================================
+
         /// <summary>
-        /// 트릭 영역의 모든 카드를 가로 일렬로 배치합니다.
-        /// anchoredPosition을 직접 계산합니다.
+        /// 트릭 영역의 카드를 플레이어 위치 기반으로 방사형 배치합니다.
+        /// 각 카드는 해당 플레이어의 방향에서 중앙으로 놓입니다.
         /// </summary>
         private void RepositionTrickCards()
         {
             int count = _trickCardObjects.Count;
             if (count == 0) return;
 
-            float cardWidth = 120f * 0.85f;  // 카드 폭 × 스케일
-            float spacing = 15f;
-            float totalWidth = count * cardWidth + (count - 1) * spacing;
-            float startX = -totalWidth / 2f + cardWidth / 2f;
-
             for (int i = 0; i < count; i++)
             {
                 if (_trickCardObjects[i] == null) continue;
 
-                // 등장 애니메이션 중인 카드는 스킵 — 애니메이션이 위치를 직접 제어
+                // 등장 애니메이션 중인 카드는 스킵
                 var cardUI = _trickCardObjects[i].GetComponent<CardUI>();
                 if (cardUI != null && cardUI.IsAnimating) continue;
 
                 var rt = _trickCardObjects[i].GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    rt.anchorMin = new Vector2(0.5f, 0.5f);
-                    rt.anchorMax = new Vector2(0.5f, 0.5f);
-                    rt.pivot = new Vector2(0.5f, 0.5f);
-                    rt.sizeDelta = new Vector2(120f, 170f);
-                    rt.anchoredPosition = new Vector2(startX + i * (cardWidth + spacing), 0f);
-                }
+                if (rt == null) continue;
+
+                // 카드를 낸 플레이어의 인덱스 얻기
+                int playerIndex = GetTrickCardPlayerIndex(i);
+                Vector2 pos = GetTrickCardPosition(playerIndex);
+
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(120f, 170f);
+                rt.anchoredPosition = pos;
+
+                // 약간의 회전으로 자연스러운 느낌
+                float tiltAngle = (i - count / 2f) * 5f;
+                rt.localEulerAngles = new Vector3(0, 0, tiltAngle);
             }
+        }
+
+        /// <summary>
+        /// 트릭 카드 인덱스에 해당하는 플레이어 인덱스를 반환합니다.
+        /// TrickCards 리스트에서 PlayerIndex를 추출합니다.
+        /// </summary>
+        private int GetTrickCardPlayerIndex(int trickCardIndex)
+        {
+            if (_gameManager.State == null) return 0;
+            var trickCards = _gameManager.State.TrickCards;
+            if (trickCardIndex < trickCards.Count)
+                return trickCards[trickCardIndex].PlayerIndex;
+            return 0;
+        }
+
+        /// <summary>
+        /// 플레이어 인덱스에 따른 트릭 카드 배치 좌표를 반환합니다.
+        /// 각 플레이어의 좌석 위치에서 중앙 방향으로 카드를 놓습니다.
+        /// </summary>
+        private Vector2 GetTrickCardPosition(int playerIndex)
+        {
+            int playerCount = _gameManager.State.Players.Length;
+            int seat = GetSeatSlot(playerIndex, playerCount);
+            float r = 85f; // 중앙에서의 거리
+
+            return seat switch
+            {
+                0 => new Vector2(0, -r),                 // Bottom (나)
+                1 => new Vector2(-r * 1.3f, -r * 0.2f),  // Left
+                2 => new Vector2(-r * 0.9f, r * 0.7f),   // TopLeft
+                3 => new Vector2(0, r),                   // Top
+                4 => new Vector2(r * 0.9f, r * 0.7f),    // TopRight
+                5 => new Vector2(r * 1.3f, -r * 0.2f),   // Right
+                _ => Vector2.zero
+            };
+        }
+
+        /// <summary>
+        /// 플레이어 인덱스를 화면 좌석 슬롯(0~5)으로 변환합니다.
+        /// 인간 플레이어는 항상 0(Bottom), 나머지는 시계방향.
+        /// </summary>
+        private int GetSeatSlot(int playerIndex, int playerCount)
+        {
+            // UpdateScoreboard과 동일한 매핑
+            int[] mapping;
+            if (playerCount == 6) mapping = new int[] { 0, 1, 2, 3, 4, 5 };
+            else if (playerCount == 5) mapping = new int[] { 0, 1, 2, 4, 5 };
+            else if (playerCount == 4) mapping = new int[] { 0, 1, 3, 5 };
+            else if (playerCount == 3) mapping = new int[] { 0, 1, 5 };
+            else mapping = new int[] { 0, 3 };
+
+            return (playerIndex < mapping.Length) ? mapping[playerIndex] : 3;
         }
 
         private bool IsCardPlayable(CardData card)
@@ -817,5 +891,187 @@ namespace SkullKing.UI
                 _ => phase.ToString()
             };
         }
+
+        // ============================================================
+        // 3D 원근 캔버스 설정 — "정면에서 보는 카드" 느낌의 핵심
+        // ============================================================
+
+        /// <summary>
+        /// Canvas를 Screen Space - Camera 모드로 전환하여
+        /// 3D 회전에 원근감(perspective)이 적용되도록 합니다.
+        /// </summary>
+        private void SetupPerspectiveCanvas()
+        {
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            // Canvas를 카메라 기반 렌더링으로 전환
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = cam;
+            canvas.planeDistance = 100f;
+
+            // 카메라 원근 투영 확인
+            cam.orthographic = false;
+            cam.fieldOfView = 60f;
+
+            Debug.Log("[FrontView] Canvas -> Screen Space - Camera (원근 투영 활성화)");
+
+            // 손패 영역: 약한 X축 회전 (강하면 카드가 너무 누워보임)
+            if (_playerHandArea != null)
+            {
+                _playerHandArea.localEulerAngles = new Vector3(3f, 0f, 0f);
+            }
+
+            // 트릭 영역: X축 회전으로 테이블 면 원근감
+            if (_trickArea != null)
+            {
+                _trickArea.localEulerAngles = new Vector3(35f, 0f, 0f);
+            }
+        }
+
+        // ============================================================
+        // 프론트뷰 동적 UI 생성 및 관리
+        // ============================================================
+
+        /// <summary>
+        /// 프론트뷰 UI 요소들을 런타임에 동적으로 생성합니다.
+        /// 첫 라운드 시작 시 한 번만 호출됩니다.
+        /// </summary>
+        private void SetupFrontViewLayout()
+        {
+            if (_frontViewInitialized) return;
+            if (_gameManager.State == null) return;
+
+            int playerCount = _gameManager.State.Players.Length;
+            var players = _gameManager.State.Players;
+
+            // ★ Canvas를 3D 원근 모드로 전환 (핵심!)
+            SetupPerspectiveCanvas();
+
+            // Canvas 찾기 (프로필 패널/상대 카드를 배치할 부모)
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                Debug.LogWarning("[FrontView] Canvas를 찾을 수 없습니다!");
+                return;
+            }
+
+            Transform canvasTransform = canvas.transform;
+
+            // ---- 상대 카드 뒷면 표시 생성 (3D 회전 적용!) ----
+            var opponentList = new List<OpponentHandDisplay>();
+            for (int i = 0; i < playerCount; i++)
+            {
+                if (players[i].IsHuman) continue;
+
+                int seat = GetSeatSlot(i, playerCount);
+                Vector2 opponentAnchor = GetOpponentHandAnchor(seat);
+
+                var handObj = new GameObject($"OpponentHand_{players[i].Name}");
+                handObj.transform.SetParent(canvasTransform, false);
+
+                var rt = handObj.AddComponent<RectTransform>();
+                rt.anchorMin = opponentAnchor;
+                rt.anchorMax = opponentAnchor;
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(300f, 150f);
+
+                // ★ 좌석별 3D 회전 적용 — 상대 카드도 프론트뷰!
+                Vector3 seatRotation = GetOpponentHandRotation(seat);
+                rt.localEulerAngles = seatRotation;
+
+                var display = handObj.AddComponent<OpponentHandDisplay>();
+                display.Setup(seat, players[i].Hand.Count);
+
+                opponentList.Add(display);
+            }
+            _opponentDisplays = opponentList.ToArray();
+
+            _frontViewInitialized = true;
+            Debug.Log($"[FrontView] 프론트뷰 UI 초기화 완료 ({playerCount}명)");
+        }
+
+        /// <summary>
+        /// 좌석 슬롯에 따른 상대 카드 뒷면 표시 앵커 위치를 반환합니다.
+        /// </summary>
+        private Vector2 GetOpponentHandAnchor(int seat)
+        {
+            return seat switch
+            {
+                1 => new Vector2(0.10f, 0.45f),   // Left
+                2 => new Vector2(0.15f, 0.75f),   // TopLeft
+                3 => new Vector2(0.50f, 0.82f),   // Top
+                4 => new Vector2(0.85f, 0.75f),   // TopRight
+                5 => new Vector2(0.90f, 0.45f),   // Right
+                _ => new Vector2(0.5f, 0.5f)
+            };
+        }
+
+        /// <summary>
+        /// 좌석 슬롯에 따른 상대 카드 컨테이너 회전을 반환합니다.
+        /// Z축 회전만 사용하여 부채꼴 방향을 전환합니다.
+        /// (3D X/Y 회전은 원근 Canvas에서 심하게 왜곡되므로 사용하지 않음)
+        /// </summary>
+        private Vector3 GetOpponentHandRotation(int seat)
+        {
+            return seat switch
+            {
+                1 => new Vector3(0f, 0f, -90f),    // Left: 세로 (아래를 향함)
+                2 => new Vector3(0f, 0f, -35f),    // TopLeft: 대각
+                3 => Vector3.zero,                  // Top: 가로 (기본)
+                4 => new Vector3(0f, 0f, 35f),     // TopRight: 대각 반대
+                5 => new Vector3(0f, 0f, 90f),     // Right: 세로 (아래를 향함)
+                _ => Vector3.zero
+            };
+        }
+
+        /// <summary>
+        /// 모든 프로필 패널의 정보를 갱신합니다.
+        /// </summary>
+        private void UpdateProfilePanels()
+        {
+            if (_profilePanels == null || _gameManager.State == null) return;
+
+            for (int i = 0; i < _profilePanels.Length; i++)
+            {
+                if (_profilePanels[i] == null) continue;
+                var p = _gameManager.State.Players[i];
+
+                _profilePanels[i].UpdateInfo(
+                    p.Bid,
+                    p.TricksWon,
+                    p.TotalScore,
+                    p.Hand.Count,
+                    p.HasBid,
+                    i == _gameManager.State.CurrentPlayerIndex
+                );
+            }
+        }
+
+        /// <summary>
+        /// 상대 플레이어의 카드 뒷면 표시를 갱신합니다.
+        /// </summary>
+        private void RefreshOpponentHands()
+        {
+            if (_opponentDisplays == null || _gameManager.State == null) return;
+
+            int displayIdx = 0;
+            for (int i = 0; i < _gameManager.State.Players.Length; i++)
+            {
+                if (_gameManager.State.Players[i].IsHuman) continue;
+                if (displayIdx >= _opponentDisplays.Length) break;
+
+                _opponentDisplays[displayIdx].SetCardCount(
+                    _gameManager.State.Players[i].Hand.Count
+                );
+                displayIdx++;
+            }
+        }
     }
 }
+
