@@ -50,7 +50,7 @@ namespace SkullKing.Data
         // 특수 카드 — 각각 고유 일러스트
         // ============================================================
 
-        [Header("=== 용사 (해적) — 5명 각각 다른 일러스트 ===")]
+        [Header("=== 무협 특수 — 5명 각각 다른 일러스트 ===")]
 
         [Tooltip("용사 1 — 예: 전사")]
         public Sprite pirate1Sprite;
@@ -67,7 +67,7 @@ namespace SkullKing.Data
         [Tooltip("용사 5 — 예: 성기사")]
         public Sprite pirate5Sprite;
 
-        [Header("=== MERMAID — 판타지 용사/마왕 ===")]
+        [Header("=== 판타지 특수 — 용사/마왕 ===")]
 
         [Tooltip("MERMAID 1 — 빨간 판타지 용사")]
         public Sprite mermaid1Sprite;
@@ -77,16 +77,16 @@ namespace SkullKing.Data
 
         [Header("=== 기타 특수 카드 ===")]
 
-        [Tooltip("스컬킹 — 보라색 사이버펑크 보스")]
+        [Tooltip("사이버펑크 — 보라색 보스")]
         public Sprite skullKingSprite;
 
-        [Tooltip("타이그리스 — 이중 스파이/변신술사")]
+        [Tooltip("암살자 — 무협 또는 항복 역할 선택")]
         public Sprite tigressSprite;
 
-        [Tooltip("크라켄 — 거대 괴수")]
+        [Tooltip("종말 — 트릭 무효화")]
         public Sprite krakenSprite;
 
-        [Tooltip("백경 — 성수/백룡")]
+        [Tooltip("천사 — 숫자만으로 판정")]
         public Sprite whiteWhaleSprite;
 
         [Tooltip("도주 — 도망/후퇴")]

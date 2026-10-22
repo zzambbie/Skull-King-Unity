@@ -44,6 +44,32 @@ namespace SkullKing.Data
         Escape          // 도주로 사용
     }
 
+    /// <summary>Player-facing CROSSION names. Enum values remain stable for saved data and networking.</summary>
+    public static class CrossionCardNames
+    {
+        public static string Role(SpecialType special) => special switch
+        {
+            SpecialType.Pirate => "무협",
+            SpecialType.Mermaid => "판타지",
+            SpecialType.SkullKing => "사이버펑크",
+            SpecialType.WhiteWhale => "천사",
+            SpecialType.Kraken => "종말",
+            SpecialType.Tigress => "암살자",
+            SpecialType.Escape => "항복",
+            SpecialType.Jewel => "특수 항복",
+            _ => "숫자"
+        };
+
+        public static string World(CardSuit suit) => suit switch
+        {
+            CardSuit.Green => "무협",
+            CardSuit.Yellow => "판타지",
+            CardSuit.Purple => "사이버펑크",
+            CardSuit.Black => "공허",
+            _ => "?"
+        };
+    }
+
     /// <summary>
     /// 카드 데이터. 불변(immutable) 구조체.
     /// </summary>
@@ -84,14 +110,7 @@ namespace SkullKing.Data
         /// <summary>숫자 카드 생성</summary>
         public static CardData CreateNumberCard(int id, CardSuit suit, int number)
         {
-            string suitName = suit switch
-            {
-                CardSuit.Green => "활",       // 🏹 레인저 — 숲의 초록
-                CardSuit.Yellow => "검",      // ⚔️ 나이트 — 황금 빛
-                CardSuit.Purple => "지팡이",  // 🔮 메이지 — 신비 보라
-                CardSuit.Black => "흑마도서", // 📖 다크메이지 — 먹빛
-                _ => "?"
-            };
+            string suitName = CrossionCardNames.World(suit);
             return new CardData
             {
                 Id = id,
@@ -107,18 +126,7 @@ namespace SkullKing.Data
         {
             if (displayName == null)
             {
-                displayName = special switch
-                {
-                    SpecialType.SkullKing => "스컬킹",
-                    SpecialType.Mermaid => "인어",
-                    SpecialType.Pirate => "해적",
-                    SpecialType.Tigress => "타이그리스",
-                    SpecialType.Kraken => "크라켄",
-                    SpecialType.WhiteWhale => "백경",
-                    SpecialType.Escape => "도주",
-                    SpecialType.Jewel => "보석",
-                    _ => "???"
-                };
+                displayName = CrossionCardNames.Role(special);
             }
             return new CardData
             {

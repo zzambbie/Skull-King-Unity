@@ -32,6 +32,7 @@ namespace SkullKing.UI
         private int _page;
         private int _category;
         private string _savedDraft;
+        private IllustratedRulebookView _illustratedView;
         private string Folder => Path.Combine(Application.persistentDataPath, "Feedback");
 
         private void Awake()
@@ -63,6 +64,15 @@ namespace SkullKing.UI
             Close();
             _page = 0;
             if (_helpPanel != null) _helpPanel.SetActive(true);
+            if (_rulebook != null && _rulebook.illustratedLayout && _helpPanel != null)
+            {
+                if (_illustratedView == null)
+                {
+                    _illustratedView = gameObject.GetComponent<IllustratedRulebookView>();
+                    if (_illustratedView == null) _illustratedView = gameObject.AddComponent<IllustratedRulebookView>();
+                }
+                _illustratedView.BuildIfNeeded(_helpPanel, _pageTitle, _pageBody, _pageNumber, _helpScroll);
+            }
             ShowPage();
         }
         public void ShowFeedback()
@@ -93,8 +103,10 @@ namespace SkullKing.UI
             if (_pageTitle != null) _pageTitle.text = page.title;
             if (_pageBody != null) _pageBody.text = page.body;
             if (_pageNumber != null) _pageNumber.text = (_page + 1) + " / " + count;
+            if (_illustratedView != null) _illustratedView.Show(page);
             Canvas.ForceUpdateCanvases();
-            if (_helpScroll != null) _helpScroll.verticalNormalizedPosition = 1f;
+            if (_helpScroll != null && (_illustratedView == null || !_illustratedView.IsReady))
+                _helpScroll.verticalNormalizedPosition = 1f;
         }
         public void NextCategory()
         {

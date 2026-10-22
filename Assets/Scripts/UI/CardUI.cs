@@ -433,14 +433,14 @@ namespace SkullKing.UI
 
             string modeLabel = mode switch
             {
-                TigressChoice.Pirate => "용사",
+                TigressChoice.Pirate => "무협",
                 TigressChoice.Escape => "항복",
                 _ => ""
             };
 
             if (!string.IsNullOrEmpty(modeLabel))
             {
-                _nameText.text = $"타이그리스\n<size=14>({modeLabel})</size>";
+                _nameText.text = $"암살자\n<size=14>({modeLabel})</size>";
             }
 
             // 프레임 색상도 선택에 맞게 변경하여 시각적으로 즉시 구분 가능

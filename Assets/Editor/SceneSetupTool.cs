@@ -564,17 +564,17 @@ namespace SkullKing.Editor
             tigressTitleRect.offsetMin = Vector2.zero;
             tigressTitleRect.offsetMax = Vector2.zero;
             var tigressTitleText = tigressTitle.AddComponent<Text>();
-            tigressTitleText.text = "타이그리스 모드 선택";
+            tigressTitleText.text = "암살자: 역할을 선택하세요";
             tigressTitleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             tigressTitleText.fontSize = 24;
             tigressTitleText.alignment = TextAnchor.MiddleCenter;
             tigressTitleText.color = TextColor;
 
-            var tigressPirateBtn = CreateButton(tigressPanel, "TigressPirateButton", "🏴 해적",
+            var tigressPirateBtn = CreateButton(tigressPanel, "TigressPirateButton", "무협으로 공격",
                 new Vector2(0.05f, 0.1f), new Vector2(0.48f, 0.55f), 24);
             tigressPirateBtn.GetComponent<Image>().color = new Color(0.5f, 0.1f, 0.1f);
 
-            var tigressEscapeBtn = CreateButton(tigressPanel, "TigressEscapeButton", "🏳 도주",
+            var tigressEscapeBtn = CreateButton(tigressPanel, "TigressEscapeButton", "항복으로 회피",
                 new Vector2(0.52f, 0.1f), new Vector2(0.95f, 0.55f), 24);
             tigressEscapeBtn.GetComponent<Image>().color = new Color(0.4f, 0.4f, 0.4f);
 

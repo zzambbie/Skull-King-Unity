@@ -112,7 +112,7 @@ namespace SkullKing.UI
             if (_title != null) _title.text = trick.Number > 0
                 ? trick.Round + "라운드 · " + trick.Number + "번째 판 (" + (index + 1) + "/" + _history.Tricks.Count + ")"
                 : _history.Round + "라운드 · 아직 제출 기록이 없습니다";
-            if (_hint != null) _hint.text = trick.Voided ? "크라켄 · 트릭 무효" : "제출 순서 · 마우스/Alt로 확인";
+            if (_hint != null) _hint.text = trick.Voided ? "종말 · 트릭 무효" : "제출 순서 · 마우스/Alt로 확인";
             if (_currentButton != null) _currentButton.interactable = historical;
             if (_previousButton != null) _previousButton.interactable = index > 0;
             if (_nextButton != null) _nextButton.interactable = historical;

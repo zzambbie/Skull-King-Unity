@@ -108,23 +108,12 @@ namespace SkullKing.UI
             _bottomNumber.gameObject.SetActive(card.IsNumberCard);
             _type.text = card.IsNumberCard ? card.Suit switch
             {
-                CardSuit.Green => "초록 · 숫자",
-                CardSuit.Yellow => "노랑 · 숫자",
-                CardSuit.Purple => "보라 · 숫자",
-                CardSuit.Black => "검정 · 으뜸패",
+                CardSuit.Green => "무협 · 숫자",
+                CardSuit.Yellow => "판타지 · 숫자",
+                CardSuit.Purple => "사이버펑크 · 숫자",
+                CardSuit.Black => "공허 · 으뜸패",
                 _ => "숫자"
-            } : card.Special switch
-            {
-                SpecialType.Escape => "항복",
-                SpecialType.Jewel => "특수 항복",
-                SpecialType.Kraken => "크라켄",
-                SpecialType.WhiteWhale => "천상강림",
-                SpecialType.Pirate => "해적",
-                SpecialType.Mermaid => "인어",
-                SpecialType.SkullKing => "스컬킹",
-                SpecialType.Tigress => "타이그리스",
-                _ => "특수"
-            };
+            } : CrossionCardNames.Role(card.Special);
         }
 
         public void SetArtworkFrame(Sprite frame)

@@ -14,8 +14,9 @@ namespace SkullKing.Editor
             int network = CressionNetworkChecks.RunSnapshotChecks(true);
             int styling = CressionCouncilInterfaceSetup.RunStyleSafetyChecks();
             int cardEffect = CressionCardEffectChecks.RunChecks();
+            int rulebook = CressionRulebookChecks.RunChecks();
             Debug.Log("[CROSSION Checks] 기록 " + history + ", 특수 판정 " + whale + ", 네트워크 " + network
-                + ", UI 보호 " + styling + ", 카드 연출 영역 " + cardEffect + "개 검사 통과. 씬/프리팹은 변경하지 않았습니다.");
+                + ", UI 보호 " + styling + ", 카드 연출 영역 " + cardEffect + ", 그림 규칙 " + rulebook + "개 검사 통과. 씬/프리팹은 변경하지 않았습니다.");
         }
     }
 }

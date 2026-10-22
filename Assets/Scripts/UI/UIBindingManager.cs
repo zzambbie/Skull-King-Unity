@@ -90,6 +90,7 @@ namespace SkullKing.UI
 
             SetActive(_bidPanel, false);
             SetActive(_tigressPanel, false);
+            LocalizeAssassinPanel();
             SetActive(_roundResultPanel, false);
             SetActive(_gameEndPanel, false);
 
@@ -307,7 +308,7 @@ namespace SkullKing.UI
         {
             if (result.IsVoided)
             {
-                SetText(_trickResultText, "크라켄! 트릭 무효!");
+                SetText(_trickResultText, "종말! 이번 트릭은 무효!");
             }
             else
             {
@@ -411,6 +412,26 @@ namespace SkullKing.UI
         private void OnBidUp() { if (_currentBidValue < _maxBidValue) { _currentBidValue++; UpdateBidDisplay(); } }
         private void OnBidDown() { if (_currentBidValue > 0) { _currentBidValue--; UpdateBidDisplay(); } }
         private void OnBidConfirm() { SetActive(_bidPanel, false); _gameManager.SubmitHumanBid(_currentBidValue); }
+        private void LocalizeAssassinPanel()
+        {
+            if (_tigressPanel != null)
+            {
+                foreach (var label in _tigressPanel.GetComponentsInChildren<Text>(true))
+                    if (label.text.Contains("타이그리스") || label.text.Contains("티그리스")) label.text = "암살자: 역할을 선택하세요";
+                foreach (var label in _tigressPanel.GetComponentsInChildren<TMPro.TMP_Text>(true))
+                    if (label.text.Contains("타이그리스") || label.text.Contains("티그리스")) label.text = "암살자: 역할을 선택하세요";
+            }
+            LocalizeChoice(_tigressPirateButton, "무협으로 공격");
+            LocalizeChoice(_tigressEscapeButton, "항복으로 회피");
+        }
+
+        private static void LocalizeChoice(Button button, string caption)
+        {
+            if (button == null) return;
+            foreach (var label in button.GetComponentsInChildren<Text>(true)) label.text = caption;
+            foreach (var label in button.GetComponentsInChildren<TMPro.TMP_Text>(true)) label.text = caption;
+        }
+
         private void OnTigressPirate() { SetActive(_tigressPanel, false); _gameManager.SubmitTigressChoice(TigressChoice.Pirate); }
         private void OnTigressEscape() { SetActive(_tigressPanel, false); _gameManager.SubmitTigressChoice(TigressChoice.Escape); }
         private void OnRoundResultNext() { SetActive(_roundResultPanel, false); _gameManager.SubmitRoundConfirm(); }

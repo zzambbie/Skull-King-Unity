@@ -22,8 +22,8 @@ namespace SkullKing.UI
         {
             _details = (order + 1) + ". " + entry.owner + " · " + entry.played.Card.DisplayName;
             if (entry.played.Card.Special == SpecialType.Tigress)
-                _details += entry.played.TigressMode == TigressChoice.Pirate ? " (해적 선택)" : " (항복 선택)";
-            _idleHint = voided ? "크라켄 · 트릭 무효" : "제출 순서 · 마우스/Alt로 확인";
+                _details += entry.played.TigressMode == TigressChoice.Pirate ? " (무협 선택)" : " (항복 선택)";
+            _idleHint = voided ? "종말 · 트릭 무효" : "제출 순서 · 마우스/Alt로 확인";
             if (_owner != null)
             {
                 _owner.richText = false;
@@ -46,7 +46,7 @@ namespace SkullKing.UI
             if (_state != null)
             {
                 string mode = entry.played.Card.Special == SpecialType.Tigress
-                    ? (entry.played.TigressMode == TigressChoice.Pirate ? "해적" : "항복") : "";
+                    ? (entry.played.TigressMode == TigressChoice.Pirate ? "무협" : "항복") : "";
                 _state.text = voided ? "무효" : leader ? (previous ? "승리 카드" : "현재 선두") : mode;
                 _state.color = leader && !voided ? new Color(1f, .83f, .35f) : new Color(.8f, .83f, .88f);
             }
