@@ -12,21 +12,55 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c081920eb24e2474598b222963a97ad3, type: 3}
   m_Name: CardSpriteDatabase
   m_EditorClassIdentifier: Assembly-CSharp::SkullKing.Data.CardSpriteDatabase
-  greenSuitSprite: {fileID: 21300000, guid: 16074a3069f2f30419897240c4cdcec1, type: 3}
-  yellowSuitSprite: {fileID: 21300000, guid: 3f9fd726a4aa8fd46be9e586c332ab39, type: 3}
-  purpleSuitSprite: {fileID: 21300000, guid: d595c14ada38dcb498d0e1509d5ed248, type: 3}
-  blackSuitSprite: {fileID: 21300000, guid: 35c8191e78601bb4ab9a5eddd52ee080, type: 3}
-  pirate1Sprite: {fileID: 0}
-  pirate2Sprite: {fileID: 0}
-  pirate3Sprite: {fileID: 0}
-  pirate4Sprite: {fileID: 0}
-  pirate5Sprite: {fileID: 0}
-  mermaid1Sprite: {fileID: 0}
-  mermaid2Sprite: {fileID: 0}
-  skullKingSprite: {fileID: 0}
-  tigressSprite: {fileID: 0}
-  krakenSprite: {fileID: 0}
-  whiteWhaleSprite: {fileID: 0}
-  escapeSprite: {fileID: 0}
-  jewelSprite: {fileID: 0}
-  cardBackSprite: {fileID: 0}
+  greenSuitSprite: {fileID: 21300000, guid: 7c13421bcaf3e774c8ecd8b1a83434eb, type: 3}
+  yellowSuitSprite: {fileID: 21300000, guid: ff79e4bc864d42244b53bf2b84481aec, type: 3}
+  purpleSuitSprite: {fileID: 21300000, guid: 582c84631079d664697f4e4cd6f6e70d, type: 3}
+  blackSuitSprite: {fileID: 21300000, guid: 3c9d7e81456a1b542bf16ee52b75818b, type: 3}
+  greenSuitSprites:
+  - {fileID: 21300000, guid: 7c13421bcaf3e774c8ecd8b1a83434eb, type: 3}
+  - {fileID: 21300000, guid: 70c73ee781ee37a458c182572c49567f, type: 3}
+  - {fileID: 21300000, guid: 0994c691ad6cfc444ac023e86d7b2f47, type: 3}
+  - {fileID: 21300000, guid: 0c1a25f7bff796a498aaf657581ad4a8, type: 3}
+  yellowSuitSprites:
+  - {fileID: 21300000, guid: ff79e4bc864d42244b53bf2b84481aec, type: 3}
+  - {fileID: 21300000, guid: 36ec8102e20351e48a4fb139b7247e7b, type: 3}
+  - {fileID: 21300000, guid: 7eaf255817ef8694fb501a59b5ac2390, type: 3}
+  - {fileID: 21300000, guid: 26290918f916fcc468bbab6b6e4cf1c4, type: 3}
+  purpleSuitSprites:
+  - {fileID: 21300000, guid: 582c84631079d664697f4e4cd6f6e70d, type: 3}
+  - {fileID: 21300000, guid: 5d29a763312adce4da885970dc5c2983, type: 3}
+  - {fileID: 21300000, guid: 1fd5b383047c51d40979e1a145869e40, type: 3}
+  - {fileID: 21300000, guid: 0afcec3c2abd5364c97fb3cf938eeb03, type: 3}
+  blackSuitSprites:
+  - {fileID: 21300000, guid: 3c9d7e81456a1b542bf16ee52b75818b, type: 3}
+  - {fileID: 21300000, guid: 6d5800b159760de4c83d986fc5ce57cc, type: 3}
+  - {fileID: 21300000, guid: d4ee62ec16d34ae469bf7313373d9e70, type: 3}
+  - {fileID: 21300000, guid: 742ceedab935efc4eaa8d8a7c54f763b, type: 3}
+  pirate1Sprite: {fileID: 21300000, guid: afdd7e5e479db8a40be9acb289cdb3e2, type: 3}
+  pirate2Sprite: {fileID: 21300000, guid: 748751961eac1904b810d33d1d559d59, type: 3}
+  pirate3Sprite: {fileID: 21300000, guid: 4bf633f56418fee4a8f7a7179708e7ae, type: 3}
+  pirate4Sprite: {fileID: 21300000, guid: 580766f6b81c9a04992d4f424dee5138, type: 3}
+  pirate5Sprite: {fileID: 21300000, guid: 465b79cf028ca4b4a828c45765863f9a, type: 3}
+  mermaid1Sprite: {fileID: 21300000, guid: 65cb3ecb171a48944a8f72703d9e5b2c, type: 3}
+  mermaid2Sprite: {fileID: 21300000, guid: 4864f7774a264cc47b7c7db97ce707e1, type: 3}
+  skullKingSprite: {fileID: 21300000, guid: 277bede34ce833f4388a2c694c341b94, type: 3}
+  tigressSprite: {fileID: 21300000, guid: 7b94c02ffeb81c444b48a20ccd662cb2, type: 3}
+  krakenSprite: {fileID: 21300000, guid: 760c5359c3264724ac9ab913e72c43ef, type: 3}
+  whiteWhaleSprite: {fileID: 21300000, guid: 82a59d34f8c740dab4bc87141ff734d6, type: 3}
+  escapeSprite: {fileID: 21300000, guid: 082ce502a0ba7952b98e17b31b2767e6, type: 3}
+  escapeSprites:
+  - {fileID: 21300000, guid: 082ce502a0ba7952b98e17b31b2767e6, type: 3}
+  - {fileID: 21300000, guid: c9db87d242cdaf9fd176580864b47512, type: 3}
+  - {fileID: 21300000, guid: fdb4fdfbe17f7fbfe8c05d036f0b1d07, type: 3}
+  - {fileID: 21300000, guid: 13ee00e70f8f17eb976051abf999d214, type: 3}
+  jewelSprite: {fileID: 21300000, guid: 5df1c9637d31da0d182454da10dfc6e4, type: 3}
+  cardBackSprite: {fileID: 21300000, guid: cff60ccad2831394090ed85e74f7839a, type: 3}
+  wuxiaFrameSprite: {fileID: 21300000, guid: 3fa742a95ca6a3044a72a76a754641e4, type: 3}
+  fantasyFrameSprite: {fileID: 21300000, guid: 63e0d80bde0769541a16ab5ab242d0b2, type: 3}
+  cyberpunkFrameSprite: {fileID: 21300000, guid: 541de97277bf35e43900f3b630ed917c, type: 3}
+  voidFrameSprite: {fileID: 21300000, guid: 83cdf1f411b3b7f4bb560b9bb55caaa8, type: 3}
+  allianceSprites:
+  - {fileID: 21300000, guid: 5df1c9637d31da0d182454da10dfc6e4, type: 3}
+  - {fileID: 21300000, guid: 93d6bfeb113d37fa1e88b86c3c5d94d9, type: 3}
+  - {fileID: 21300000, guid: 777f5523d2c62e6ee4117e65ceeb48d8, type: 3}
+  allianceFrameSprites: []

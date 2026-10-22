@@ -34,9 +34,6 @@ namespace SkullKing.Data
         /// <summary>이번 라운드에서 이긴 트릭 수</summary>
         public int TricksWon { get; set; }
 
-        /// <summary>이번 라운드에서 획득한 보너스 점수 (Loot)</summary>
-        public int BonusPoints { get; set; }
-
         /// <summary>이번 라운드에 형성된 보석 동맹(다른 플레이어의 인덱스) 목록</summary>
         public List<int> JewelAlliances { get; private set; } = new List<int>();
 
@@ -66,7 +63,6 @@ namespace SkullKing.Data
             Bid = 0;
             HasBid = false;
             TricksWon = 0;
-            BonusPoints = 0;
             JewelAlliances.Clear();
         }
 

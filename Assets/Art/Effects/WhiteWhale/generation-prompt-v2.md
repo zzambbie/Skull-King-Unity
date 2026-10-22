@@ -1,0 +1,7 @@
+# Heaven descent wing cluster v2
+
+Tool: built-in image generation (imagegen skill default mode).
+Reference: Assets/Art/Cards/CROSSION/Composed/Heaven_card.png (style reference, not edit target).
+Output: heaven-descent-wings-v2.png, original alpha preserved.
+
++Use case: stylized-concept. Asset type: transparent PNG Unity card-game VFX sprite. Input image: reference image ONLY, the existing Heaven's Descent card; do not edit the card. Primary request: make ONE isolated RIGHT-SIDE SERAPH WING CLUSTER matching the exact wings seen in the reference card, for mirroring into the card's six-wing divine apparition. Three closely overlapping feathered wings fan out from a shared dense attachment on the LEFT at mid height: one sweeps up-right, one extends right, one sweeps down-right. Warm ivory/cream feathers, fine brilliant gold edging along the feathers, warm amber-gold inner feather shadows and crisp golden highlights, SAME polished anime fantasy illustration linework and coloring as the reference. Not a drooping gray-blue bird wing. Keep the wing cluster broad and dense through its center so it can veil a playing card when folded inward. Complete silhouette visible, narrow transparent padding, genuine transparent RGBA background including between the outer tips; NO background halo or mist, no glow outside the solid silhouette. No character, no robe, no body, no eye, no halo, no card frame, no sky, no clouds, no text, no watermark, no black backdrop or painted checkerboard. Only the warm ivory and gold three-wing cluster.

@@ -1,0 +1,24 @@
+[
+  {
+    "file": "CROSSION_01_Confluence_Lobby_Draft.wav",
+    "seconds": 106.667,
+    "rate": 48000,
+    "channels": 2,
+    "peak_dbfs": -2.5,
+    "rms_dbfs": -14.17,
+    "loop_boundary_step": 0.0006354660639187604,
+    "finite": true,
+    "sha256": "26a0c6ab69c281ce0be12becd2757f5674252eaac9be5d77c0f47364dc333b4d"
+  },
+  {
+    "file": "CROSSION_02_Rift_Table_Gameplay_Draft.wav",
+    "seconds": 85.333,
+    "rate": 48000,
+    "channels": 2,
+    "peak_dbfs": -2.5,
+    "rms_dbfs": -15.09,
+    "loop_boundary_step": 0.0034741587914796646,
+    "finite": true,
+    "sha256": "bcd13f54ed4838f8be291f59fb7648920d666f741870414b3004d5d0916adc3c"
+  }
+]

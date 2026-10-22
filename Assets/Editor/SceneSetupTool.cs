@@ -1,6 +1,6 @@
 // ============================================================
 // SceneSetupTool.cs — Unity 에디터 자동 씬/UI 생성 도구
-// 메뉴: SkullKing > 전체 씬 자동 생성
+// 복구용 보관 코드: 수동 편집 보호를 위해 상단 자동 생성 메뉴는 등록하지 않습니다.
 // ============================================================
 #if UNITY_EDITOR
 using UnityEngine;
@@ -28,21 +28,18 @@ namespace SkullKing.Editor
         // 메인 메뉴
         // ============================================================
 
-        [MenuItem("SkullKing/1. 카드 프리팹 생성")]
         public static void CreateCardPrefab()
         {
             CreateCardPrefabAsset();
             Debug.Log("★ 카드 프리팹 생성 완료! Assets/Prefabs/CardPrefab.prefab");
         }
 
-        [MenuItem("SkullKing/2. 로비 씬 생성")]
         public static void SetupLobbyScene()
         {
             BuildLobbyScene();
             Debug.Log("★ 로비 씬 생성 완료! Assets/Scenes/LobbyScene.unity");
         }
 
-        [MenuItem("SkullKing/3. 게임 씬 생성")]
         public static void SetupGameScene()
         {
             // 카드 프리팹이 있는지 확인
@@ -61,7 +58,6 @@ namespace SkullKing.Editor
             Debug.Log("★ 게임 씬 생성 완료! Assets/Scenes/GameScene.unity");
         }
 
-        [MenuItem("SkullKing/4. Build Settings에 씬 등록")]
         public static void RegisterScenesToBuild()
         {
             var scenes = new EditorBuildSettingsScene[]
@@ -73,7 +69,6 @@ namespace SkullKing.Editor
             Debug.Log("★ Build Settings에 LobbyScene(0), GameScene(1) 등록 완료!");
         }
 
-        [MenuItem("SkullKing/★ 전체 자동 세팅 (1~4 한번에)")]
         public static void SetupAll()
         {
             CreateCardPrefabAsset();
@@ -104,14 +99,15 @@ namespace SkullKing.Editor
             // 루트 오브젝트 (카드)
             var cardRoot = new GameObject("CardPrefab");
             var cardRect = cardRoot.AddComponent<RectTransform>();
-            cardRect.sizeDelta = new Vector2(120, 170);
+            // 카드 원본 일러스트(832x1216)의 정확한 13:19 비율을 유지합니다.
+            cardRect.sizeDelta = new Vector2(120f, 120f * 19f / 13f);
 
             // 카드에 LayoutElement 추가 (레이아웃 그룹 내에서 크기 유지)
             var layoutElem = cardRoot.AddComponent<LayoutElement>();
-            layoutElem.preferredWidth = 120;
-            layoutElem.preferredHeight = 170;
+            layoutElem.preferredWidth = 120f;
+            layoutElem.preferredHeight = 120f * 19f / 13f;
             layoutElem.minWidth = 80;
-            layoutElem.minHeight = 110;
+            layoutElem.minHeight = 80f * 19f / 13f;
 
             // 배경 이미지
             var bgImage = cardRoot.AddComponent<Image>();
@@ -125,7 +121,7 @@ namespace SkullKing.Editor
             button.colors = colors;
 
             // 카드 내부 배경 (약간 안쪽에 실제 색상 표시)
-            var innerBg = CreateUIChild(cardRoot, "InnerBackground", new Vector2(110, 160));
+            var innerBg = CreateUIChild(cardRoot, "InnerBackground", new Vector2(110f, 120f * 19f / 13f - 10f));
             var innerBgImg = innerBg.AddComponent<Image>();
             innerBgImg.color = new Color(0.3f, 0.7f, 0.3f); // 기본 초록
 
@@ -243,7 +239,16 @@ namespace SkullKing.Editor
             var bg = CreateUIChild(canvasObj, "Background", Vector2.zero);
             var bgRect = StretchFull(bg);
             var bgImg = bg.AddComponent<Image>();
-            bgImg.color = TableColor;
+            var lobbyBackground = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/LobbyBackground.png");
+            bgImg.sprite = lobbyBackground;
+            bgImg.color = lobbyBackground != null ? new Color(.8f, .8f, .8f, 1f) : TableColor;
+            bgImg.raycastTarget = false;
+            if (lobbyBackground != null)
+            {
+                var fitter = bg.AddComponent<AspectRatioFitter>();
+                fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                fitter.aspectRatio = lobbyBackground.rect.width / lobbyBackground.rect.height;
+            }
 
             // 타이틀
             var titleObj = CreateUIChild(canvasObj, "TitleText", Vector2.zero);

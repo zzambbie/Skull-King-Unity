@@ -10,6 +10,7 @@ namespace SkullKing.Logic
     /// <summary>
     /// 트릭 판정 결과
     /// </summary>
+    [System.Serializable]
     public struct TrickResult
     {
         /// <summary>승자의 플레이어 인덱스 (-1이면 승자 없음 = 크라켄 무효화)</summary>
@@ -17,12 +18,6 @@ namespace SkullKing.Logic
 
         /// <summary>트릭이 무효화되었는가 (크라켄)</summary>
         public bool IsVoided;
-
-        /// <summary>이 트릭에서 발생한 보너스 점수</summary>
-        public int BonusPoints;
-
-        /// <summary>보너스 상세 설명 (디버그/UI용)</summary>
-        public string BonusDescription;
 
         /// <summary>크라켄 무효 시, 크라켄이 없었더라면 이겼을 플레이어 (-1이면 없음)</summary>
         public int WouldBeWinnerIndex;
@@ -33,8 +28,6 @@ namespace SkullKing.Logic
             {
                 WinnerIndex = -1,
                 IsVoided = true,
-                BonusPoints = 0,
-                BonusDescription = "크라켄 — 트릭 무효!",
                 WouldBeWinnerIndex = wouldBeWinner
             };
         }
@@ -46,6 +39,18 @@ namespace SkullKing.Logic
     /// </summary>
     public static class TrickResolver
     {
+        /// <summary>Among Kraken and White Whale, the latest submitted card controls the trick.</summary>
+        public static SpecialType GetActiveTrickOverride(List<PlayedCard> playedCards)
+        {
+            if (playedCards != null)
+                for (int i = playedCards.Count - 1; i >= 0; i--)
+                {
+                    SpecialType special = playedCards[i].Card.Special;
+                    if (special == SpecialType.Kraken || special == SpecialType.WhiteWhale) return special;
+                }
+            return SpecialType.None;
+        }
+
         /// <summary>
         /// 트릭에 제출된 카드들을 분석하여 승자를 결정합니다.
         /// </summary>
@@ -60,10 +65,11 @@ namespace SkullKing.Logic
             }
 
             // ============================================
-            // 1단계: 크라켄 체크 — 트릭 즉시 무효화
+            // 1단계: 크라켄/천상강림 중 나중에 제출된 카드의 규칙 적용
             // 단, 크라켄이 없었을 때의 가정 승자도 계산
             // ============================================
-            if (HasSpecial(playedCards, SpecialType.Kraken))
+            var activeOverride = GetActiveTrickOverride(playedCards);
+            if (activeOverride == SpecialType.Kraken)
             {
                 // 크라켄을 제외하고 재판정하여 가정 승자 결정
                 var withoutKraken = new List<PlayedCard>();
@@ -91,7 +97,7 @@ namespace SkullKing.Logic
             // ============================================
             // 2단계: 백경 체크 — 모든 특수 능력 무시, 숫자만으로 판정
             // ============================================
-            if (HasSpecial(playedCards, SpecialType.WhiteWhale))
+            if (activeOverride == SpecialType.WhiteWhale)
             {
                 return ResolveWhiteWhale(playedCards);
             }
@@ -111,8 +117,7 @@ namespace SkullKing.Logic
                 {
                     WinnerIndex = playedCards[mermaidIdx].PlayerIndex,
                     IsVoided = false,
-                    BonusPoints = 0,
-                    BonusDescription = "인어가 스컬킹 포획 (보너스 삭제)"
+                    WouldBeWinnerIndex = -1
                 };
             }
 
@@ -124,8 +129,7 @@ namespace SkullKing.Logic
                 {
                     WinnerIndex = playedCards[skIdx].PlayerIndex,
                     IsVoided = false,
-                    BonusPoints = 0,
-                    BonusDescription = ""
+                    WouldBeWinnerIndex = -1
                 };
             }
 
@@ -137,8 +141,7 @@ namespace SkullKing.Logic
                 {
                     WinnerIndex = playedCards[pirateIdx].PlayerIndex,
                     IsVoided = false,
-                    BonusPoints = 0,
-                    BonusDescription = ""
+                    WouldBeWinnerIndex = -1
                 };
             }
 
@@ -150,8 +153,7 @@ namespace SkullKing.Logic
                 {
                     WinnerIndex = playedCards[mermaidIdx].PlayerIndex,
                     IsVoided = false,
-                    BonusPoints = 0,
-                    BonusDescription = ""
+                    WouldBeWinnerIndex = -1
                 };
             }
 
@@ -190,8 +192,7 @@ namespace SkullKing.Logic
             {
                 WinnerIndex = playedCards[bestIdx].PlayerIndex,
                 IsVoided = false,
-                BonusPoints = 0,
-                BonusDescription = "백경 — 순수 숫자 대결!"
+                WouldBeWinnerIndex = -1
             };
         }
 
@@ -233,8 +234,7 @@ namespace SkullKing.Logic
                 {
                     WinnerIndex = playedCards[0].PlayerIndex,
                     IsVoided = false,
-                    BonusPoints = 0,
-                    BonusDescription = "모두 도주 — 선턴 승리"
+                    WouldBeWinnerIndex = -1
                 };
             }
 
@@ -242,8 +242,7 @@ namespace SkullKing.Logic
             {
                 WinnerIndex = playedCards[bestIdx].PlayerIndex,
                 IsVoided = false,
-                BonusPoints = 0,
-                BonusDescription = ""
+                WouldBeWinnerIndex = -1
             };
         }
 
@@ -294,16 +293,6 @@ namespace SkullKing.Logic
                 if (cards[i].ActsAsPirate) return i;
             }
             return -1;
-        }
-
-        private static int CountPirateRoles(List<PlayedCard> cards)
-        {
-            int count = 0;
-            for (int i = 0; i < cards.Count; i++)
-            {
-                if (cards[i].ActsAsPirate) count++;
-            }
-            return count;
         }
 
         // ============================================

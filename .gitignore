@@ -37,3 +37,22 @@ ExportedObj/
 *.mdb.meta
 
 sysinfo.txt
+
+# Local recovery copies and generated verification projects/results.
+# Keep the actual Assets, Packages, ProjectSettings and source tools in Git.
+/ProjectBackups/
+/Assets/_Recovery/
+/AudioDrafts/SceneBackups/
+/Tools/Verification/Output/
+/output/surrender-unity-validation/
+*.log
+
+# Local credentials must never be committed.
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.pfx
+*.p12
+*.key

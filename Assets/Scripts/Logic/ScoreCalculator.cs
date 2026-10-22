@@ -9,6 +9,7 @@ namespace SkullKing.Logic
     /// <summary>
     /// 라운드 점수 계산 결과
     /// </summary>
+    [System.Serializable]
     public struct RoundScoreResult
     {
         /// <summary>플레이어 인덱스</summary>
@@ -26,7 +27,7 @@ namespace SkullKing.Logic
         /// <summary>기본 점수 (비딩 성공/실패에 따른 점수)</summary>
         public int BaseScore;
 
-        /// <summary>보너스 점수 (비딩 성공 시에만 가산)</summary>
+        /// <summary>보석 동맹으로 얻은 추가 점수</summary>
         public int BonusScore;
 
         /// <summary>이번 라운드 최종 점수 (Base + Bonus)</summary>
@@ -74,12 +75,6 @@ namespace SkullKing.Logic
                     desc = $"비딩 {bid} 성공! +{baseScore}점";
                 }
 
-                // 보너스는 비딩 성공 시에만 가산
-                bonusScore = player.BonusPoints;
-                if (bonusScore > 0)
-                {
-                    desc += $" (보너스 +{bonusScore}점)";
-                }
             }
             else
             {
@@ -97,7 +92,6 @@ namespace SkullKing.Logic
                     baseScore = diff * -10;
                     desc = $"비딩 {bid}, 실제 {wins} — 실패! {baseScore}점";
                 }
-                // 실패 시 보너스 없음
                 bonusScore = 0;
             }
 

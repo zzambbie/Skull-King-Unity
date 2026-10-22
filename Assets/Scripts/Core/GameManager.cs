@@ -14,8 +14,22 @@ namespace SkullKing.Core
     /// 게임의 전체 진행을 관리하는 중앙 컨트롤러.
     /// 상태 머신 패턴을 사용하여 각 페이즈를 순서대로 진행합니다.
     /// </summary>
-    public class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour
     {
+        [Serializable]
+        private struct DevelopmentCardChoice
+        {
+            [Tooltip("숫자 카드의 세력입니다. Special이 None일 때 사용합니다. 무협=Green, 판타지=Yellow, 사이버펑크=Purple, 공허=Black")]
+            public CardSuit suit;
+
+            [Range(1, 14)]
+            [Tooltip("숫자 카드의 숫자입니다.")]
+            public int number;
+
+            [Tooltip("특수 카드 종류입니다. None이면 Suit와 Number로 숫자 카드를 만듭니다.")]
+            public SpecialType special;
+        }
+
         // ============================================================
         // 이벤트 — UI Binding Layer에서 구독
         // ============================================================
@@ -70,6 +84,8 @@ namespace SkullKing.Core
 
         /// <summary>현재 게임이 진행 중인가?</summary>
         public bool IsGameRunning { get; private set; }
+        private readonly PresentationGate _presentationGate = new PresentationGate();
+        public void SetPresentationHold(object owner, bool held) => _presentationGate.Set(owner, held);
 
         // ============================================================
         // 내부 변수
@@ -91,6 +107,24 @@ namespace SkullKing.Core
 
         // 트릭 사이 딜레이
         [SerializeField] private float _trickResolveDelay = 1.5f;
+
+        [Header("=== 개발용 테스트 모드 ===")]
+        [Tooltip("Unity Editor 또는 Development Build에서만 적용됩니다.")]
+        [SerializeField] private bool _developmentTestMode;
+
+        [Range(1, 10)]
+        [Tooltip("테스트를 시작할 라운드입니다. 지정한 라운드 수만큼 카드를 받습니다.")]
+        [SerializeField] private int _developmentStartRound = 5;
+
+        [Tooltip("사람 플레이어 손패의 앞쪽부터 교체할 카드 목록입니다. 비워 둔 나머지는 정상 분배 카드를 사용합니다.")]
+        [SerializeField] private DevelopmentCardChoice[] _developmentHumanHand;
+
+        [Tooltip("실제 GameScene과 UI를 사용하면서 사람 입력까지 AI가 대신해 1~10라운드를 자동 완주합니다.")]
+        [SerializeField] private bool _developmentAutoPlayFullGame;
+
+        [Range(0.1f, 2f)]
+        [Tooltip("자동 진행에서 입력과 다음 행동 사이의 대기 시간입니다. UI 확인용 권장값은 0.35~0.6초입니다.")]
+        [SerializeField] private float _developmentAutoPlayStepDelay = 0.4f;
 
         // 라운드 간 선턴 이어받기용
         private int _lastTrickWinnerIndex = 0;
@@ -152,6 +186,95 @@ namespace SkullKing.Core
             StartCoroutine(GameLoop());
         }
 
+        private bool IsDevelopmentTestModeEnabled()
+        {
+            return !_networkAuthority && _developmentTestMode && (Application.isEditor || Debug.isDebugBuild);
+        }
+
+        private bool IsDevelopmentAutoPlayEnabled()
+        {
+            return !_networkAuthority && _developmentAutoPlayFullGame && (Application.isEditor || Debug.isDebugBuild);
+        }
+
+        private float GetFlowDelay(float normalDelay)
+        {
+            return IsDevelopmentAutoPlayEnabled()
+                ? Mathf.Max(0.1f, _developmentAutoPlayStepDelay)
+                : normalDelay;
+        }
+
+        private int GetDevelopmentStartRound()
+        {
+            if (IsDevelopmentAutoPlayEnabled()) return 1;
+            return IsDevelopmentTestModeEnabled()
+                ? Mathf.Clamp(_developmentStartRound, 1, 10)
+                : 1;
+        }
+
+        /// <summary>
+        /// 정상 분배가 끝난 뒤 사람 플레이어의 손패 앞쪽만 Inspector의 테스트 카드로 교체합니다.
+        /// 나머지 카드와 AI 손패, 실제 턴 및 승패 판정은 정상 게임 흐름을 그대로 사용합니다.
+        /// </summary>
+        private void ApplyDevelopmentHandPreset(int roundNumber)
+        {
+            if (!IsDevelopmentTestModeEnabled()
+                || _developmentHumanHand == null
+                || _developmentHumanHand.Length == 0
+                || State?.Players == null)
+            {
+                return;
+            }
+
+            PlayerData human = null;
+            foreach (PlayerData player in State.Players)
+            {
+                if (player != null && player.IsHuman)
+                {
+                    human = player;
+                    break;
+                }
+            }
+
+            if (human == null || human.Hand == null) return;
+
+            int replaceCount = Mathf.Min(roundNumber, human.Hand.Count, _developmentHumanHand.Length);
+            int replaced = 0;
+            int escapeVariant = 0;
+            int pirateVariant = 0;
+            int mermaidVariant = 0;
+            for (int i = 0; i < replaceCount; i++)
+            {
+                DevelopmentCardChoice choice = _developmentHumanHand[i];
+                int debugId = -100000 - (roundNumber * 100) - i;
+
+                if (choice.special != SpecialType.None)
+                {
+                    // 여러 장이 서로 다른 그림을 쓰는 특수 카드는 음수 ID의 끝자리로
+                    // 테스트용 변형 번호를 보존합니다. 실제 덱 ID와도 충돌하지 않습니다.
+                    debugId = choice.special switch
+                    {
+                        SpecialType.Escape => -1000 - escapeVariant++,
+                        SpecialType.Pirate => -2000 - pirateVariant++,
+                        SpecialType.Mermaid => -3000 - mermaidVariant++,
+                        _ => debugId
+                    };
+                    human.Hand[i] = CardData.CreateSpecialCard(debugId, choice.special);
+                    replaced++;
+                }
+                else if (choice.suit != CardSuit.None)
+                {
+                    human.Hand[i] = CardData.CreateNumberCard(
+                        debugId,
+                        choice.suit,
+                        Mathf.Clamp(choice.number, 1, 14));
+                    replaced++;
+                }
+            }
+
+            if (replaced > 0)
+                Debug.Log($"[Development Test] {roundNumber}라운드 인간 손패에 지정 카드 {replaced}장을 적용했습니다.");
+        }
+
         // ============================================================
         // 메인 게임 루프
         // ============================================================
@@ -163,7 +286,8 @@ namespace SkullKing.Core
             _lastTrickWinnerIndex = UnityEngine.Random.Range(0, State.PlayerCount); 
             Debug.Log($"[GameManager] 1라운드 첫 선: {State.Players[_lastTrickWinnerIndex].Name}");
 
-            for (int round = 1; round <= State.TotalRounds; round++)
+            int firstRound = GetDevelopmentStartRound();
+            for (int round = firstRound; round <= State.TotalRounds; round++)
             {
                 yield return StartCoroutine(RunRound(round));
                 _isFirstRound = false;
@@ -188,11 +312,12 @@ namespace SkullKing.Core
             _deck.CreateFullDeck();
             _deck.Shuffle();
             _deck.DealToPlayers(State.Players, roundNumber);
+            ApplyDevelopmentHandPreset(roundNumber);
 
             Debug.Log($"[Dealing] 각 플레이어에게 {roundNumber}장 분배 완료");
             OnCardsDealt?.Invoke();
 
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(GetFlowDelay(0.5f));
 
             // ---- 2. 비딩 페이즈 ----
             ChangePhase(GamePhase.Bidding);
@@ -215,11 +340,16 @@ namespace SkullKing.Core
                 Debug.Log($"  {State.Players[i].Name}: {scores[i].Description} (누적: {State.Players[i].TotalScore})");
             }
 
+            _waitingForRoundConfirm = true;
             OnRoundEnded?.Invoke(scores);
 
             // 라운드 결과 확인 대기 (인간이 "다음" 버튼을 누를 때까지)
-            _waitingForRoundConfirm = true;
             Debug.Log("[라운드 결과] 확인 대기 중... (다음 버튼을 눌러주세요)");
+            if (IsDevelopmentAutoPlayEnabled())
+            {
+                yield return new WaitForSeconds(GetFlowDelay(0.5f));
+                SubmitRoundConfirm();
+            }
             while (_waitingForRoundConfirm)
             {
                 yield return null;
@@ -251,6 +381,12 @@ namespace SkullKing.Core
 
                     Debug.Log($"[Bidding] {player.Name}의 비딩을 기다리는 중...");
 
+                    if (IsDevelopmentAutoPlayEnabled())
+                    {
+                        yield return new WaitForSeconds(GetFlowDelay(_aiTurnDelay * 0.5f));
+                        SubmitHumanBid(_ai.DecideBid(player.Hand, State.PlayerCount));
+                    }
+
                     // 인간 입력 대기
                     while (_waitingForHumanBid)
                     {
@@ -262,7 +398,7 @@ namespace SkullKing.Core
                 else
                 {
                     // AI 비딩
-                    yield return new WaitForSeconds(_aiTurnDelay * 0.5f);
+                    yield return new WaitForSeconds(GetFlowDelay(_aiTurnDelay * 0.5f));
                     player.Bid = _ai.DecideBid(player.Hand, State.PlayerCount);
                 }
 
@@ -309,6 +445,16 @@ namespace SkullKing.Core
 
                     Debug.Log($"[Play] {player.Name}의 카드 선택을 기다리는 중... (가능: {playableCards.Count}장)");
 
+                    if (IsDevelopmentAutoPlayEnabled())
+                    {
+                        yield return new WaitForSeconds(GetFlowDelay(_aiTurnDelay));
+                        int remaining = State.TricksInRound - State.CurrentTrick + 1;
+                        CardData automaticCard = _ai.ChooseCard(
+                            player.Hand, playableCards, State.TrickCards,
+                            State.LeadSuit, player.Bid, player.TricksWon, remaining);
+                        SubmitHumanCard(automaticCard);
+                    }
+
                     while (_waitingForHumanCard)
                     {
                         yield return null;
@@ -322,6 +468,13 @@ namespace SkullKing.Core
                         _waitingForTigressChoice = true;
                         OnTigressChoiceRequested?.Invoke(player);
 
+                        if (IsDevelopmentAutoPlayEnabled())
+                        {
+                            yield return new WaitForSeconds(GetFlowDelay(_aiTurnDelay));
+                            int remaining = State.TricksInRound - State.CurrentTrick + 1;
+                            SubmitTigressChoice(_ai.DecideTigressMode(player.Bid, player.TricksWon, remaining));
+                        }
+
                         while (_waitingForTigressChoice)
                         {
                             yield return null;
@@ -333,7 +486,7 @@ namespace SkullKing.Core
                 else
                 {
                     // AI 카드 선택
-                    yield return new WaitForSeconds(_aiTurnDelay);
+                    yield return new WaitForSeconds(GetFlowDelay(_aiTurnDelay));
 
                     int remainingTricks = State.TricksInRound - State.CurrentTrick + 1;
                     selectedCard = _ai.ChooseCard(
@@ -370,11 +523,19 @@ namespace SkullKing.Core
                 Debug.Log($"[Play] {player.Name} → {playedCard}");
                 OnCardPlayed?.Invoke(playedCard);
 
+                // The visible single-player UI synchronously acquires its hold in the event.
+                // Wait for the actual coroutine, not an estimated timer: no next AI turn,
+                // trick resolution or round-end phase may run through a celestial effect.
+                while (_presentationGate.IsHeld) yield return null;
+
+                // 모든 화면에서 이전 카드의 이동이 끝난 뒤 다음 입력을 허용합니다.
+                if (_networkAuthority) yield return new WaitForSeconds(1.25f);
+
                 currentIdx = State.GetNextPlayerIndex(currentIdx);
             }
 
             // ---- 트릭 판정 ----
-            yield return new WaitForSeconds(_trickResolveDelay * 0.5f);
+            yield return new WaitForSeconds(GetFlowDelay(_trickResolveDelay * 0.5f));
 
             ChangePhase(GamePhase.TrickResolve);
             var result = TrickResolver.Resolve(State.TrickCards, State.LeadSuit);
@@ -395,12 +556,10 @@ namespace SkullKing.Core
             {
                 var winner = State.Players[result.WinnerIndex];
                 winner.TricksWon++;
-                winner.BonusPoints += result.BonusPoints;
                 State.LeaderIndex = result.WinnerIndex;
                 _lastTrickWinnerIndex = result.WinnerIndex;
 
-                Debug.Log($"[Resolve] 승자: {winner.Name}" +
-                    (result.BonusPoints > 0 ? $" ({result.BonusDescription})" : ""));
+                Debug.Log($"[Resolve] 승자: {winner.Name}");
             }
 
             // ---- 보석(Jewel) 동맹 결성 로직 ----
@@ -430,7 +589,7 @@ namespace SkullKing.Core
                 ChangePhase(GamePhase.Playing);
             }
 
-            yield return new WaitForSeconds(_trickResolveDelay * 0.5f);
+            yield return new WaitForSeconds(GetFlowDelay(_trickResolveDelay * 0.5f));
         }
 
         // ============================================================
@@ -464,6 +623,7 @@ namespace SkullKing.Core
         /// </summary>
         public void SubmitHumanBid(int bidValue)
         {
+            if (_networkSession != null) { _networkSession.Submit("bid", bidValue); return; }
             if (!_waitingForHumanBid)
             {
                 Debug.LogWarning("[GameManager] 비딩 대기 상태가 아닙니다!");
@@ -484,6 +644,8 @@ namespace SkullKing.Core
         /// </summary>
         public void SubmitHumanCard(CardData card)
         {
+            if (_presentationGate.IsHeld) return;
+            if (_networkSession != null) { _networkSession.Submit("card", card.Id); return; }
             if (!_waitingForHumanCard)
             {
                 Debug.LogWarning("[GameManager] 카드 제출 대기 상태가 아닙니다!");
@@ -501,6 +663,7 @@ namespace SkullKing.Core
         /// </summary>
         public void SubmitTigressChoice(TigressChoice choice)
         {
+            if (_networkSession != null) { _networkSession.Submit("tigress", (int)choice); return; }
             if (!_waitingForTigressChoice)
             {
                 Debug.LogWarning("[GameManager] 타이그리스 선택 대기 상태가 아닙니다!");
@@ -519,6 +682,7 @@ namespace SkullKing.Core
         /// </summary>
         public void SubmitRoundConfirm()
         {
+            if (_networkSession != null) { _networkSession.Submit("confirm", 0); return; }
             if (!_waitingForRoundConfirm)
             {
                 Debug.LogWarning("[GameManager] 라운드 결과 확인 대기 상태가 아닙니다!");

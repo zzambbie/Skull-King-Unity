@@ -1,0 +1,15 @@
+{
+  "texture": "Assets/Art/UI/Council/council-title-atlas-v1.png",
+  "pieces": [
+    { "name": "CouncilLogo", "x": 140, "y": 0, "width": 1260, "height": 530 },
+    { "name": "CouncilButton", "x": 135, "y": 530, "width": 1270, "height": 220 },
+    { "name": "SingleIcon", "x": 20, "y": 775, "width": 155, "height": 230 },
+    { "name": "MultiIcon", "x": 210, "y": 775, "width": 305, "height": 230 },
+    { "name": "RulesIcon", "x": 525, "y": 765, "width": 230, "height": 240 },
+    { "name": "SettingsIcon", "x": 770, "y": 765, "width": 230, "height": 240 },
+    { "name": "FeedbackIcon", "x": 1020, "y": 765, "width": 240, "height": 240 },
+    { "name": "ExitIcon", "x": 1278, "y": 765, "width": 240, "height": 240 },
+    { "name": "SettingsGlyph", "x": 818, "y": 818, "width": 140, "height": 140 },
+    { "name": "ExitGlyph", "x": 1335, "y": 824, "width": 136, "height": 132 }
+  ]
+}

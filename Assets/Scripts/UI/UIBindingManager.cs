@@ -12,111 +12,75 @@ using SkullKing.Core;
 
 namespace SkullKing.UI
 {
-    /// <summary>
-    /// GameManager의 이벤트를 구독하여 씬의 UI를 갱신하는 브릿지 역할.
-    /// 모든 UI 오브젝트는 회원님이 씬에 배치 후 Inspector에서 드래그 연결합니다.
-    /// </summary>
-    public class UIBindingManager : MonoBehaviour
+    public partial class UIBindingManager : MonoBehaviour
     {
         // ============================================================
-        // [SerializeField] — 회원님이 연결할 UI 참조들
+        // [SerializeField] — UI 참조들
         // ============================================================
-
         [Header("=== 필수 참조 ===")]
         [SerializeField] private GameManager _gameManager;
 
         [Header("=== 페이즈 표시 ===")]
-        [Tooltip("현재 게임 페이즈를 표시할 텍스트")]
         [SerializeField] private Text _phaseText;
-
-        [Tooltip("현재 라운드/트릭 정보 텍스트")]
         [SerializeField] private Text _roundInfoText;
 
         [Header("=== 비딩 패널 ===")]
-        [Tooltip("비딩 패널 루트 오브젝트 (활성화/비활성화 용)")]
         [SerializeField] private GameObject _bidPanel;
-
-        [Tooltip("비딩 수 입력 필드 또는 표시 텍스트")]
         [SerializeField] private Text _bidValueText;
-
-        [Tooltip("비딩 +1 버튼")]
         [SerializeField] private Button _bidUpButton;
-
-        [Tooltip("비딩 -1 버튼")]
         [SerializeField] private Button _bidDownButton;
-
-        [Tooltip("비딩 확정 버튼")]
         [SerializeField] private Button _bidConfirmButton;
 
         [Header("=== 타이그리스 선택 패널 ===")]
-        [Tooltip("타이그리스 선택 패널 (해적/도주)")]
         [SerializeField] private GameObject _tigressPanel;
-
-        [Tooltip("해적으로 선택 버튼")]
         [SerializeField] private Button _tigressPirateButton;
-
-        [Tooltip("도주로 선택 버튼")]
         [SerializeField] private Button _tigressEscapeButton;
 
         [Header("=== 카드 영역 ===")]
-        [Tooltip("인간 플레이어의 카드를 배치할 부모 Transform")]
         [SerializeField] private Transform _playerHandArea;
-
-        [Tooltip("트릭에 제출된 카드를 표시할 영역")]
+        [SerializeField] private Transform[] _opponentHandAreas;
         [SerializeField] private Transform _trickArea;
-
-        [Tooltip("카드 프리팹 (회원님이 제작)")]
         [SerializeField] private GameObject _cardPrefab;
-
-        [Tooltip("카드 일러스트 데이터베이스 (Assets > Create > SkullKing > Card Sprite Database)")]
         [SerializeField] private CardSpriteDatabase _spriteDatabase;
+        [SerializeField] private TrickHistoryView _trickHistory;
+        [Header("=== 백경: 날개로 가린 순간 선두 카드 교체 ===")]
+        [SerializeField] private WhaleWingTransition _whaleWingTransition;
 
         [Header("=== 스코어보드 ===")]
-        [Tooltip("각 플레이어의 점수/비딩 정보를 표시할 텍스트 배열 (최대 6명)")]
         [SerializeField] private Text[] _playerInfoTexts;
 
         [Header("=== 결과 표시 ===")]
-        [Tooltip("트릭 결과 표시 텍스트")]
         [SerializeField] private Text _trickResultText;
-
-        [Tooltip("라운드 결과 패널")]
         [SerializeField] private GameObject _roundResultPanel;
-
-        [Tooltip("라운드 결과 상세 텍스트")]
         [SerializeField] private Text _roundResultText;
-
-        [Tooltip("라운드 결과 '다음' 버튼")]
         [SerializeField] private Button _roundResultNextButton;
-
-        [Tooltip("게임 종료 패널")]
         [SerializeField] private GameObject _gameEndPanel;
-
-        [Tooltip("게임 종료 결과 텍스트")]
         [SerializeField] private Text _gameEndText;
+
+        [Header("=== 턴 화살표 ===")]
+        [SerializeField] private GameObject _turnArrow;
 
         // ============================================================
         // 내부 상태
         // ============================================================
-
         private int _currentBidValue = 0;
         private int _maxBidValue = 0;
         private List<CardData> _currentPlayableCards = new List<CardData>();
         private List<GameObject> _handCardObjects = new List<GameObject>();
         private List<GameObject> _trickCardObjects = new List<GameObject>();
         private bool _trickCardsDirty = false;
+        private GameObject _currentTopCardObj; // 현재 1등 카드 기록용
+        private List<GameObject> _customAnimatingCards = new List<GameObject>(); // 2단계 애니메이션 추적용
+        private List<PlayedCard> _currentTrickCards = new List<PlayedCard>();
+        private float _cardInputUnlockTime;
 
-        // ============================================================
-        // 프론트뷰 동적 UI 요소
-        // ============================================================
-
-        private PlayerProfilePanel[] _profilePanels;
-        private OpponentHandDisplay[] _opponentDisplays;
-        private bool _frontViewInitialized = false;
+        private Coroutine _phaseTextRoutine;
+        private GamePhase _currentPhase;
+        private bool _layoutFixed = false;
 
         // ============================================================
         // 초기화
         // ============================================================
-
         private void Awake()
         {
             if (_gameManager == null)
@@ -124,45 +88,40 @@ namespace SkullKing.UI
                 _gameManager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
             }
 
-            // 패널 초기 비활성화
             SetActive(_bidPanel, false);
             SetActive(_tigressPanel, false);
             SetActive(_roundResultPanel, false);
             SetActive(_gameEndPanel, false);
 
             if (_roundResultText != null)
-            {
                 _roundResultText.alignment = TextAnchor.MiddleCenter;
-            }
 
-            // 영역의 Layout 컴포넌트 제거 (수동 배치 사용)
             DestroyAreaLayoutComponents(_trickArea);
             DestroyAreaLayoutComponents(_playerHandArea);
         }
 
-        /// <summary>
-        /// 매 프레임 트릭 카드 위치를 강제 적용합니다.
-        /// Unity 레이아웃 시스템보다 늦게 실행되어 위치를 확실히 보장합니다.
-        /// </summary>
+        private void DestroyAreaLayoutComponents(Transform area)
+        {
+            if (area == null) return;
+            var layoutGroups = area.GetComponents<UnityEngine.UI.LayoutGroup>();
+            foreach (var layout in layoutGroups)
+            {
+                DestroyImmediate(layout);
+            }
+        }
+
         private void LateUpdate()
         {
-            if (_trickCardObjects.Count > 0)
+            if (_trickCardObjects.Count > 0 && _trickCardsDirty)
             {
                 RepositionTrickCards();
-            }
-
-            // 손패 카드도 매 프레임 위치 강제 — Unity 레이아웃 시스템 간섭 완전 차단
-            if (_handCardObjects.Count > 0)
-            {
-                RepositionHandCards();
+                _trickCardsDirty = false;
             }
         }
 
         private void OnEnable()
         {
             if (_gameManager == null) return;
-
-            // 이벤트 구독
             _gameManager.OnPhaseChanged += HandlePhaseChanged;
             _gameManager.OnRoundStarted += HandleRoundStarted;
             _gameManager.OnCardsDealt += HandleCardsDealt;
@@ -177,8 +136,8 @@ namespace SkullKing.UI
             _gameManager.OnRoundEnded += HandleRoundEnded;
             _gameManager.OnGameEnded += HandleGameEnded;
             _gameManager.OnCurrentPlayerChanged += HandleCurrentPlayerChanged;
+            _gameManager.OnNetworkStatusChanged += HandleNetworkStatus;
 
-            // 버튼 연결
             if (_bidUpButton) _bidUpButton.onClick.AddListener(OnBidUp);
             if (_bidDownButton) _bidDownButton.onClick.AddListener(OnBidDown);
             if (_bidConfirmButton) _bidConfirmButton.onClick.AddListener(OnBidConfirm);
@@ -189,8 +148,8 @@ namespace SkullKing.UI
 
         private void OnDisable()
         {
+            CancelPresentations();
             if (_gameManager == null) return;
-
             _gameManager.OnPhaseChanged -= HandlePhaseChanged;
             _gameManager.OnRoundStarted -= HandleRoundStarted;
             _gameManager.OnCardsDealt -= HandleCardsDealt;
@@ -205,6 +164,7 @@ namespace SkullKing.UI
             _gameManager.OnRoundEnded -= HandleRoundEnded;
             _gameManager.OnGameEnded -= HandleGameEnded;
             _gameManager.OnCurrentPlayerChanged -= HandleCurrentPlayerChanged;
+            _gameManager.OnNetworkStatusChanged -= HandleNetworkStatus;
 
             if (_bidUpButton) _bidUpButton.onClick.RemoveListener(OnBidUp);
             if (_bidDownButton) _bidDownButton.onClick.RemoveListener(OnBidDown);
@@ -215,36 +175,69 @@ namespace SkullKing.UI
         }
 
         // ============================================================
-        // 이벤트 핸들러 — GameManager 이벤트 수신
+        // 이벤트 핸들러
         // ============================================================
+        private void HandleNetworkStatus(string message)
+        {
+            SetText(_trickResultText, message);
+            if (_gameManager.IsGameRunning) return;
+            CancelPresentations();
+            _currentPlayableCards.Clear();
+            SetActive(_bidPanel, false);
+            SetActive(_tigressPanel, false);
+            SetActive(_roundResultPanel, false);
+            if (_turnArrow != null) _turnArrow.SetActive(false);
+        }
 
         private void HandlePhaseChanged(GamePhase phase)
         {
-            SetText(_phaseText, GetPhaseDisplayName(phase));
+            EnqueuePresentation(() => PresentInstant(() => ShowPhaseChanged(phase)));
+        }
+
+        private void ShowPhaseChanged(GamePhase phase)
+        {
+            _currentPhase = phase;
+            string txt = GetPhaseDisplayName(phase);
+
+            if (phase == GamePhase.Bidding || phase == GamePhase.Playing || phase == GamePhase.Dealing)
+            {
+                if (_phaseTextRoutine != null) StopCoroutine(_phaseTextRoutine);
+                _phaseTextRoutine = StartCoroutine(TemporaryTextCoroutine(_phaseText, txt, 2f));
+            }
+            else
+            {
+                SetActive(_phaseText.gameObject, true);
+                SetText(_phaseText, txt);
+            }
+
+            if (_gameManager != null && _gameManager.State != null)
+            {
+                HandleCurrentPlayerChanged(_gameManager.State.CurrentPlayerIndex);
+            }
+        }
+
+        private System.Collections.IEnumerator TemporaryTextCoroutine(Text textObj, string msg, float duration)
+        {
+            if (textObj != null)
+            {
+                textObj.gameObject.SetActive(true);
+                textObj.text = msg;
+                yield return new WaitForSeconds(duration);
+                textObj.gameObject.SetActive(false);
+            }
         }
 
         private void HandleRoundStarted(int roundNumber)
         {
-            // 선턴 플레이어 정보 표시
-            var leader = _gameManager.State.Players[_gameManager.State.RoundStartPlayerIndex];
-            SetText(_roundInfoText, $"라운드 {roundNumber}  ┃  선턴: {leader.Name}");
+            if (_trickHistory != null) _trickHistory.BeginRound(roundNumber);
+            SetText(_roundInfoText, $"라운드 {roundNumber}");
             SetActive(_roundResultPanel, false);
             UpdateScoreboard();
         }
 
         private void HandleCardsDealt()
         {
-            // 프론트뷰 초기화 (첫 라운드에서만)
-            if (!_frontViewInitialized)
-            {
-                SetupFrontViewLayout();
-            }
-
-            // 인간 플레이어의 손패를 UI에 표시
-            RefreshPlayerHand();
-
-            // 상대 플레이어 카드 수 갱신
-            RefreshOpponentHands();
+            RefreshAllHands();
         }
 
         private void HandleBidRequested(PlayerData player, int maxBid)
@@ -253,11 +246,7 @@ namespace SkullKing.UI
             _maxBidValue = maxBid;
             UpdateBidDisplay();
             SetActive(_bidPanel, true);
-
-            // 선턴 정보를 라운드 정보에 지속 표시
-            var leader = _gameManager.State.Players[_gameManager.State.RoundStartPlayerIndex];
-            SetText(_roundInfoText,
-                $"라운드 {_gameManager.State.CurrentRound}  ┃  선턴: {leader.Name}");
+            SetText(_roundInfoText, $"라운드 {_gameManager.State.CurrentRound}");
         }
 
         private void HandlePlayerBid(PlayerData player)
@@ -273,16 +262,21 @@ namespace SkullKing.UI
 
         private void HandleTrickStarted(int trickNumber, int leaderIndex)
         {
-            SetText(_roundInfoText,
-                $"라운드 {_gameManager.State.CurrentRound} — 트릭 {trickNumber}");
+            EnqueuePresentation(() => PresentInstant(() => ShowTrickStarted(trickNumber, leaderIndex)));
+        }
+
+        private void ShowTrickStarted(int trickNumber, int leaderIndex)
+        {
+            SetText(_roundInfoText, $"라운드 {_gameManager.State.CurrentRound}");
             SetText(_trickResultText, "");
             ClearTrickArea();
+            if (_trickHistory != null) _trickHistory.BeginTrick(_gameManager.State.CurrentRound, trickNumber);
         }
 
         private void HandleCardPlayRequested(PlayerData player, List<CardData> playableCards)
         {
             _currentPlayableCards = playableCards;
-            RefreshPlayerHand(); // 플레이 가능한 카드 하이라이트
+            RefreshAllHands();
         }
 
         private void HandleTigressChoiceRequested(PlayerData player)
@@ -292,23 +286,24 @@ namespace SkullKing.UI
 
         private void HandleCardPlayed(PlayedCard playedCard)
         {
-            // 트릭 영역에 카드 표시
             SpawnCardInTrickArea(playedCard);
 
-            // 인간 플레이어의 카드였다면 손패 갱신
             var player = _gameManager.State.Players[playedCard.PlayerIndex];
             if (player.IsHuman)
             {
                 _currentPlayableCards.Clear();
-                RefreshPlayerHand();
             }
 
-            // 상대 카드 수 갱신
-            RefreshOpponentHands();
+            RefreshAllHands();
             UpdateScoreboard();
         }
 
         private void HandleTrickResolved(TrickResult result)
+        {
+            EnqueuePresentation(() => PresentInstant(() => ShowTrickResolved(result)));
+        }
+
+        private void ShowTrickResolved(TrickResult result)
         {
             if (result.IsVoided)
             {
@@ -318,21 +313,22 @@ namespace SkullKing.UI
             {
                 var winner = _gameManager.State.Players[result.WinnerIndex];
                 string msg = $"승자: {winner.Name}";
-                if (result.BonusPoints > 0)
-                    msg += $"\n{result.BonusDescription}";
                 SetText(_trickResultText, msg);
             }
-
             UpdateScoreboard();
         }
 
         private void HandleRoundEnded(RoundScoreResult[] results)
         {
+            EnqueuePresentation(() => PresentInstant(() => ShowRoundEnded(results)));
+        }
+
+        private void ShowRoundEnded(RoundScoreResult[] results)
+        {
             int pCount = results.Length;
             string topSpacing = pCount <= 4 ? "\n\n\n" : "\n";
             string itemSpacing = pCount <= 4 ? "\n\n" : "\n";
 
-            // 라운드 결과 패널 표시 (동적 간격)
             string text = $"{topSpacing}═══  라운드 {_gameManager.State.CurrentRound} 결과  ═══{topSpacing}";
 
             for (int i = 0; i < results.Length; i++)
@@ -352,10 +348,14 @@ namespace SkullKing.UI
 
         private void HandleGameEnded(PlayerData winner)
         {
+            EnqueuePresentation(() => PresentInstant(() => ShowGameEnded(winner)));
+        }
+
+        private void ShowGameEnded(PlayerData winner)
+        {
             string text = $"★ 게임 종료! ★\n\n";
             text += $"우승: {winner.Name} ({winner.TotalScore}점)\n\n";
 
-            // 전체 순위 표시
             var players = _gameManager.State.Players;
             var sorted = new List<PlayerData>(players);
             sorted.Sort((a, b) => b.TotalScore.CompareTo(a.TotalScore));
@@ -371,97 +371,76 @@ namespace SkullKing.UI
 
         private void HandleCurrentPlayerChanged(int playerIndex)
         {
-            // 현재 턴 플레이어 하이라이트 (스코어보드에서 강조)
             UpdateScoreboard();
-        }
 
-        // ============================================================
-        // 버튼 콜백 — UI → GameManager
-        // ============================================================
+            if (_gameManager.State == null || _turnArrow == null) return;
 
-        private void OnBidUp()
-        {
-            if (_currentBidValue < _maxBidValue)
+            int targetIndex = playerIndex;
+            if (_currentPhase == GamePhase.Bidding || _currentPhase == GamePhase.Dealing)
             {
-                _currentBidValue++;
-                UpdateBidDisplay();
+                targetIndex = _gameManager.State.LeaderIndex;
+            }
+
+            if (targetIndex >= 0 && targetIndex < _playerInfoTexts.Length)
+            {
+                var targetPanel = _playerInfoTexts[targetIndex].transform.parent;
+                if (targetPanel != null && targetPanel.gameObject.activeSelf)
+                {
+                    _turnArrow.SetActive(true);
+                    var arrowRect = _turnArrow.GetComponent<RectTransform>();
+
+                    arrowRect.SetParent(targetPanel, false);
+
+                    arrowRect.anchorMin = new Vector2(0.5f, 0.5f);
+                    arrowRect.anchorMax = new Vector2(0.5f, 0.5f);
+                    arrowRect.pivot = new Vector2(0.5f, 0.5f);
+                    arrowRect.anchoredPosition = new Vector2(0, 80f);
+                    arrowRect.localRotation = Quaternion.Euler(0, 0, 180f);
+                    arrowRect.localScale = Vector3.one;
+                }
+            }
+            else
+            {
+                _turnArrow.SetActive(false);
             }
         }
 
-        private void OnBidDown()
-        {
-            if (_currentBidValue > 0)
-            {
-                _currentBidValue--;
-                UpdateBidDisplay();
-            }
-        }
+        // ============================================================
+        // 버튼 콜백
+        // ============================================================
+        private void OnBidUp() { if (_currentBidValue < _maxBidValue) { _currentBidValue++; UpdateBidDisplay(); } }
+        private void OnBidDown() { if (_currentBidValue > 0) { _currentBidValue--; UpdateBidDisplay(); } }
+        private void OnBidConfirm() { SetActive(_bidPanel, false); _gameManager.SubmitHumanBid(_currentBidValue); }
+        private void OnTigressPirate() { SetActive(_tigressPanel, false); _gameManager.SubmitTigressChoice(TigressChoice.Pirate); }
+        private void OnTigressEscape() { SetActive(_tigressPanel, false); _gameManager.SubmitTigressChoice(TigressChoice.Escape); }
+        private void OnRoundResultNext() { SetActive(_roundResultPanel, false); _gameManager.SubmitRoundConfirm(); }
 
-        private void OnBidConfirm()
-        {
-            SetActive(_bidPanel, false);
-            _gameManager.SubmitHumanBid(_currentBidValue);
-        }
-
-        private void OnTigressPirate()
-        {
-            SetActive(_tigressPanel, false);
-            _gameManager.SubmitTigressChoice(TigressChoice.Pirate);
-        }
-
-        private void OnTigressEscape()
-        {
-            SetActive(_tigressPanel, false);
-            _gameManager.SubmitTigressChoice(TigressChoice.Escape);
-        }
-
-        private void OnRoundResultNext()
-        {
-            SetActive(_roundResultPanel, false);
-            _gameManager.SubmitRoundConfirm();
-        }
-
-        /// <summary>
-        /// 카드가 클릭되었을 때 호출됩니다.
-        /// CardUI 컴포넌트에서 호출합니다.
-        /// </summary>
         public void OnCardClicked(CardData card)
         {
-            // 현재 카드 제출 대기 중이고, 해당 카드가 플레이 가능한 카드인지 확인
-            if (_currentPlayableCards.Count == 0) return;
+            // 상대 카드가 중앙에 도착해 정리되기 전에 다음 카드를 내면 연출 순서가 뒤집힙니다.
+            // 진행 중인 제출 연출과 짧은 착지 여유 시간이 끝날 때까지 입력만 무시합니다.
+            _customAnimatingCards.RemoveAll(obj => obj == null);
+            if (_presentationBusy || _customAnimatingCards.Count > 0 || Time.time < _cardInputUnlockTime) return;
 
+            if (_currentPlayableCards.Count == 0) return;
             bool isPlayable = false;
             for (int i = 0; i < _currentPlayableCards.Count; i++)
             {
-                if (_currentPlayableCards[i].Id == card.Id)
-                {
-                    isPlayable = true;
-                    break;
-                }
+                if (_currentPlayableCards[i].Id == card.Id) { isPlayable = true; break; }
             }
-
-            if (!isPlayable)
-            {
-                Debug.Log("[UI] 이 카드는 지금 낼 수 없습니다.");
-                return;
-            }
+            if (!isPlayable) return;
 
             _currentPlayableCards.Clear();
             _gameManager.SubmitHumanCard(card);
         }
 
-
-
         // ============================================================
-        // UI 갱신 메서드
+        // UI 갱신 & 배치 메서드
         // ============================================================
-
         private void UpdateBidDisplay()
         {
             SetText(_bidValueText, _currentBidValue.ToString());
         }
-
-        private bool _layoutFixed = false;
 
         private void UpdateScoreboard()
         {
@@ -470,45 +449,7 @@ namespace SkullKing.UI
 
             if (!_layoutFixed)
             {
-                // 인원수에 맞게 완벽한 시계방향 배치를 위한 앵커 동적 할당
-                Vector2[] minAnchors = {
-                    new Vector2(0.01f, 0.01f), // 0: Bottom
-                    new Vector2(0.01f, 0.55f), // 1: Left
-                    new Vector2(0.01f, 0.78f), // 2: TopLeft
-                    new Vector2(0.38f, 0.83f), // 3: Top
-                    new Vector2(0.82f, 0.78f), // 4: TopRight
-                    new Vector2(0.85f, 0.55f)  // 5: Right
-                };
-                Vector2[] maxAnchors = {
-                    new Vector2(0.18f, 0.13f), // 0: Bottom
-                    new Vector2(0.15f, 0.72f), // 1: Left
-                    new Vector2(0.18f, 0.92f), // 2: TopLeft
-                    new Vector2(0.62f, 0.93f), // 3: Top
-                    new Vector2(0.99f, 0.92f), // 4: TopRight
-                    new Vector2(0.99f, 0.72f)  // 5: Right
-                };
-
-                int[] mapping = new int[playerCount];
-                if (playerCount == 4) mapping = new int[] { 0, 1, 3, 5 };
-                else if (playerCount == 5) mapping = new int[] { 0, 1, 2, 4, 5 };
-                else if (playerCount == 6) mapping = new int[] { 0, 1, 2, 3, 4, 5 };
-                else if (playerCount == 3) mapping = new int[] { 0, 1, 5 };
-                else if (playerCount == 2) mapping = new int[] { 0, 3 };
-
-                for (int i = 0; i < playerCount; i++)
-                {
-                    if (i < _playerInfoTexts.Length && _playerInfoTexts[i] != null)
-                    {
-                        var panelRect = _playerInfoTexts[i].transform.parent.GetComponent<RectTransform>();
-                        if (panelRect != null)
-                        {
-                            panelRect.anchorMin = minAnchors[mapping[i]];
-                            panelRect.anchorMax = maxAnchors[mapping[i]];
-                            panelRect.offsetMin = Vector2.zero;
-                            panelRect.offsetMax = Vector2.zero;
-                        }
-                    }
-                }
+                SetupDynamicLayout(playerCount);
                 _layoutFixed = true;
             }
 
@@ -517,78 +458,189 @@ namespace SkullKing.UI
                 var p = _gameManager.State.Players[i];
                 if (_playerInfoTexts[i] == null) continue;
 
-                string arrow = (i == _gameManager.State.CurrentPlayerIndex) ? "▶ " : "  ";
-                string leaderMark = (i == _gameManager.State.LeaderIndex) ? " ★선" : "";
                 string bidInfo = p.HasBid ? $"비딩:{p.Bid} 승리:{p.TricksWon}" : "비딩 대기";
-                _playerInfoTexts[i].text = $"{arrow}{p.Name}{leaderMark}  |  {bidInfo}  |  {p.TotalScore}점";
+                _playerInfoTexts[i].text = $"{p.Name}  |  {bidInfo}  |  {p.TotalScore}점";
+
+                _playerInfoTexts[i].transform.parent.gameObject.SetActive(true);
             }
 
-            // 사용되지 않는 슬롯 비우기
-            for (int i = _gameManager.State.Players.Length; i < _playerInfoTexts.Length; i++)
+            for (int i = playerCount; i < _playerInfoTexts.Length; i++)
             {
                 if (_playerInfoTexts[i] != null)
+                {
                     _playerInfoTexts[i].text = "";
+                    _playerInfoTexts[i].transform.parent.gameObject.SetActive(false);
+                }
             }
-
-            // ---- 프론트뷰 프로필 패널 갱신 ----
-            UpdateProfilePanels();
         }
 
-        /// <summary>
-        /// 인간 플레이어의 손패를 UI에 다시 그립니다.
-        /// </summary>
-        private void RefreshPlayerHand()
+        private int[] GetOpponentAreaMapping(int playerCount)
         {
-            // 기존 카드 오브젝트 제거
+            if (playerCount == 3) return new int[] { 0, 4 };
+            if (playerCount == 4) return new int[] { 0, 2, 4 };
+            if (playerCount == 5) return new int[] { 0, 1, 3, 4 };
+            if (playerCount == 6) return new int[] { 0, 1, 2, 3, 4 };
+            return new int[] { 2 };
+        }
+
+        private void SetupDynamicLayout(int playerCount)
+        {
+            if (_playerInfoTexts.Length > 0 && _playerInfoTexts[0] != null)
+            {
+                var myPanel = _playerInfoTexts[0].transform.parent.GetComponent<RectTransform>();
+                if (myPanel != null)
+                {
+                    myPanel.anchorMin = new Vector2(0f, 0f);
+                    myPanel.anchorMax = new Vector2(0f, 0f);
+                    myPanel.pivot = new Vector2(0f, 0f);
+                    myPanel.anchoredPosition = new Vector2(30f, 30f);
+                    myPanel.sizeDelta = new Vector2(320f, 120f);
+                }
+            }
+
+            int[] mapping = GetOpponentAreaMapping(playerCount);
+            Vector2[] cardPos = new Vector2[5];
+            Vector2[] scorePos = new Vector2[5];
+            float[] rot = new float[5];
+
+            if (playerCount == 6)
+            {
+                scorePos[0] = new Vector2(-700, 100); cardPos[0] = new Vector2(-630, 20); rot[0] = 0f;
+                scorePos[1] = new Vector2(-450, 320); cardPos[1] = new Vector2(-380, 240); rot[1] = 0f;
+                scorePos[2] = new Vector2(0, 350); cardPos[2] = new Vector2(0, 250); rot[2] = 0f;
+                scorePos[3] = new Vector2(450, 320); cardPos[3] = new Vector2(380, 240); rot[3] = 0f;
+                scorePos[4] = new Vector2(700, 100); cardPos[4] = new Vector2(630, 20); rot[4] = 0f;
+            }
+            else if (playerCount == 5)
+            {
+                scorePos[0] = new Vector2(-750, 150); cardPos[0] = new Vector2(-650, 70); rot[0] = 0f;
+                scorePos[1] = new Vector2(-400, 320); cardPos[1] = new Vector2(-330, 240); rot[1] = 0f;
+                scorePos[2] = Vector2.zero; cardPos[2] = Vector2.zero; rot[2] = 0f;
+                scorePos[3] = new Vector2(400, 320); cardPos[3] = new Vector2(330, 240); rot[3] = 0f;
+                scorePos[4] = new Vector2(750, 150); cardPos[4] = new Vector2(650, 70); rot[4] = 0f;
+            }
+            else if (playerCount == 4)
+            {
+                scorePos[0] = new Vector2(-750, 180); cardPos[0] = new Vector2(-650, 100); rot[0] = 0f;
+                scorePos[1] = Vector2.zero; cardPos[1] = Vector2.zero; rot[1] = 0f;
+                scorePos[2] = new Vector2(0, 350); cardPos[2] = new Vector2(0, 250); rot[2] = 0f;
+                scorePos[3] = Vector2.zero; cardPos[3] = Vector2.zero; rot[3] = 0f;
+                scorePos[4] = new Vector2(750, 180); cardPos[4] = new Vector2(650, 100); rot[4] = 0f;
+            }
+            else
+            {
+                scorePos[0] = new Vector2(-600, 250); cardPos[0] = new Vector2(-500, 150); rot[0] = 0f;
+                scorePos[1] = Vector2.zero; cardPos[1] = Vector2.zero; rot[1] = 0f;
+                scorePos[2] = new Vector2(0, 350); cardPos[2] = new Vector2(0, 250); rot[2] = 0f;
+                scorePos[3] = Vector2.zero; cardPos[3] = Vector2.zero; rot[3] = 0f;
+                scorePos[4] = new Vector2(600, 250); cardPos[4] = new Vector2(500, 150); rot[4] = 0f;
+            }
+
+            for (int i = 0; i < mapping.Length; i++)
+            {
+                int slot = mapping[i];
+
+                if (slot < _opponentHandAreas.Length && _opponentHandAreas[slot] != null)
+                {
+                    var rt = _opponentHandAreas[slot].GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        rt.anchorMin = new Vector2(0.5f, 0.5f);
+                        rt.anchorMax = new Vector2(0.5f, 0.5f);
+                        rt.pivot = new Vector2(0.5f, 0.5f);
+                        rt.anchoredPosition = cardPos[slot];
+                        rt.localRotation = Quaternion.Euler(0, 0, rot[slot]);
+                    }
+                }
+
+                int botIndex = i + 1;
+                if (botIndex < _playerInfoTexts.Length && _playerInfoTexts[botIndex] != null)
+                {
+                    var panelRect = _playerInfoTexts[botIndex].transform.parent.GetComponent<RectTransform>();
+                    if (panelRect != null)
+                    {
+                        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+                        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+                        panelRect.pivot = new Vector2(0.5f, 0.5f);
+                        panelRect.sizeDelta = new Vector2(320f, 120f);
+                        panelRect.anchoredPosition = scorePos[slot];
+                    }
+                }
+            }
+        }
+
+        private void RefreshAllHands()
+        {
             ClearHandArea();
 
-            if (_gameManager.State == null) return;
+            if (_gameManager.State == null || _cardPrefab == null) return;
 
-            // 인간 플레이어 찾기
-            PlayerData human = null;
-            for (int i = 0; i < _gameManager.State.Players.Length; i++)
+            SetupDynamicLayout(_gameManager.State.PlayerCount);
+
+            int[] areaMapping = GetOpponentAreaMapping(_gameManager.State.PlayerCount);
+            int botCount = 0;
+
+            for (int pIndex = 0; pIndex < _gameManager.State.Players.Length; pIndex++)
             {
-                if (_gameManager.State.Players[i].IsHuman)
+                var player = _gameManager.State.Players[pIndex];
+
+                if (player.IsHuman)
                 {
-                    human = _gameManager.State.Players[i];
-                    break;
-                }
-            }
-            if (human == null || _cardPrefab == null || _playerHandArea == null) return;
-
-            // 카드 오브젝트 생성
-            for (int i = 0; i < human.Hand.Count; i++)
-            {
-                var card = human.Hand[i];
-                var cardObj = Instantiate(_cardPrefab, _playerHandArea);
-                cardObj.transform.localScale = Vector3.one * 1.1f;
-
-                // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
-                var layoutElem = cardObj.GetComponent<LayoutElement>();
-                if (layoutElem != null) DestroyImmediate(layoutElem);
-
-                // CardUI 컴포넌트가 있으면 데이터 설정
-                var cardUI = cardObj.GetComponent<CardUI>();
-                if (cardUI != null)
-                {
-                    bool isPlayable = IsCardPlayable(card);
-                    cardUI.Setup(card, isPlayable, this);
-
-                    // 일러스트 자동 적용
-                    if (_spriteDatabase != null)
+                    for (int i = 0; i < player.Hand.Count; i++)
                     {
-                        var sprite = _spriteDatabase.GetSpriteForCard(card);
-                        cardUI.SetIllustration(sprite);
+                        var card = player.Hand[i];
+                        var cardObj = Instantiate(_cardPrefab, _playerHandArea);
+
+                        var layoutElem = cardObj.GetComponent<LayoutElement>();
+                        if (layoutElem != null) DestroyImmediate(layoutElem);
+
+                        var cardUI = cardObj.GetComponent<CardUI>();
+                        if (cardUI != null)
+                        {
+                            cardUI.Setup(card, IsCardPlayable(card), this);
+                            if (_spriteDatabase != null)
+                            {
+                                cardUI.SetIllustration(_spriteDatabase.GetSpriteForCard(card));
+                                cardUI.SetComposedArtwork(_spriteDatabase.IsComposedArtwork(card));
+                            }
+                            cardUI.SetAsHandCard(Vector3.one, i);
+                        }
+                        _handCardObjects.Add(cardObj);
                     }
-
-                    // 손패 호버 효과 활성화 (실제 스케일과 일치시킴)
-                    cardUI.SetAsHandCard(Vector3.one * 1.1f, i);
                 }
+                else
+                {
+                    if (botCount >= areaMapping.Length) continue;
 
-                _handCardObjects.Add(cardObj);
+                    int targetAreaIndex = areaMapping[botCount];
+                    botCount++;
+
+                    if (targetAreaIndex >= _opponentHandAreas.Length || _opponentHandAreas[targetAreaIndex] == null)
+                        continue;
+
+                    Transform targetArea = _opponentHandAreas[targetAreaIndex];
+
+                    for (int i = 0; i < player.Hand.Count; i++)
+                    {
+                        var cardObj = Instantiate(_cardPrefab, targetArea);
+                        cardObj.transform.localScale = Vector3.one * 0.8f;
+
+                        var layoutElem = cardObj.GetComponent<LayoutElement>();
+                        if (layoutElem != null) DestroyImmediate(layoutElem);
+
+                        var cardUI = cardObj.GetComponent<CardUI>();
+                        if (cardUI != null)
+                        {
+                            cardUI.Setup(player.Hand[i], false, this);
+                            cardUI.SetAsBack();
+
+                            if (_spriteDatabase != null && _spriteDatabase.cardBackSprite != null)
+                                cardUI.SetIllustration(_spriteDatabase.cardBackSprite);
+                        }
+                        _handCardObjects.Add(cardObj);
+                    }
+                }
             }
-
-            // 즉시 배치 (LateUpdate에서도 매 프레임 강제 적용됨)
             RepositionHandCards();
         }
 
@@ -597,177 +649,27 @@ namespace SkullKing.UI
             for (int i = 0; i < _handCardObjects.Count; i++)
             {
                 if (_handCardObjects[i] != null)
+                {
+                    _handCardObjects[i].transform.SetParent(null);
                     Destroy(_handCardObjects[i]);
+                }
             }
             _handCardObjects.Clear();
         }
 
         private void ClearTrickArea()
         {
+            _currentTopCardObj = null;
+            _customAnimatingCards.Clear();
+            _currentTrickCards.Clear(); // ★ 중요: 이전 트릭 카드 기록 지우기
+
             for (int i = 0; i < _trickCardObjects.Count; i++)
             {
-                if (_trickCardObjects[i] != null)
-                    Destroy(_trickCardObjects[i]);
+                if (_trickCardObjects[i] != null) Destroy(_trickCardObjects[i]);
             }
             _trickCardObjects.Clear();
         }
 
-        private void SpawnCardInTrickArea(PlayedCard playedCard)
-        {
-            if (_cardPrefab == null || _trickArea == null) return;
-
-            var cardObj = Instantiate(_cardPrefab, _trickArea);
-            cardObj.transform.localScale = Vector3.one * 0.75f;
-
-            // LayoutElement 즉시 제거 — 레이아웃 간섭 원천 차단
-            var layoutElem = cardObj.GetComponent<LayoutElement>();
-            if (layoutElem != null) DestroyImmediate(layoutElem);
-
-            var cardUI = cardObj.GetComponent<CardUI>();
-            if (cardUI != null)
-            {
-                cardUI.Setup(playedCard.Card, false, this);
-                // 누가 냈는지 라벨 표시
-                cardUI.SetOwnerLabel(_gameManager.State.Players[playedCard.PlayerIndex].Name);
-
-                // 타이그리스 모드 표시 (모든 플레이어가 용사/항복 선택을 볼 수 있도록)
-                if (playedCard.Card.Special == SpecialType.Tigress)
-                {
-                    cardUI.SetTigressMode(playedCard.TigressMode);
-                }
-
-                // 일러스트 자동 적용
-                if (_spriteDatabase != null)
-                {
-                    var sprite = _spriteDatabase.GetSpriteForCard(playedCard.Card);
-                    cardUI.SetIllustration(sprite);
-                }
-            }
-
-            _trickCardObjects.Add(cardObj);
-
-            // 기존 카드는 새 카드가 추가됨에 따라 위치 재계산
-            RepositionTrickCards();
-
-            // 새로 추가된 카드는 애니메이션으로 등장 (방사형 위치)
-            if (cardUI != null)
-            {
-                Vector2 targetPos = GetTrickCardPosition(playedCard.PlayerIndex);
-                Vector2 startOffset = GetCardEntryOffset(playedCard.PlayerIndex);
-                cardUI.PlayEntryAnimation(targetPos, Vector3.one * 0.75f, startOffset);
-            }
-
-            _trickCardsDirty = true;
-        }
-
-        /// <summary>
-        /// 플레이어 인덱스에 해당하는 패널 위치에서 트릭 영역 방향으로의 시작 오프셋을 반환합니다.
-        /// 각 슬롯 위치:
-        ///   0: Bottom (아래), 1: Left (왼쪽), 2: TopLeft (왼쪽위),
-        ///   3: Top (위), 4: TopRight (오른쪽위), 5: Right (오른쪽)
-        /// </summary>
-        private Vector2 GetCardEntryOffset(int playerIndex)
-        {
-            int playerCount = _gameManager.State.Players.Length;
-
-            // UpdateScoreboard과 동일한 슬롯 매핑
-            int[] mapping;
-            if (playerCount == 6) mapping = new int[] { 0, 1, 2, 3, 4, 5 };
-            else if (playerCount == 5) mapping = new int[] { 0, 1, 2, 4, 5 };
-            else if (playerCount == 4) mapping = new int[] { 0, 1, 3, 5 };
-            else if (playerCount == 3) mapping = new int[] { 0, 1, 5 };
-            else mapping = new int[] { 0, 3 };  // 2인
-
-            int slot = (playerIndex < mapping.Length) ? mapping[playerIndex] : 3;
-
-            // 슬롯별 방향 벡터 (트릭 영역 중앙 기준)
-            switch (slot)
-            {
-                case 0: return new Vector2(0, -250f);       // Bottom → 아래에서 올라옴
-                case 1: return new Vector2(-350f, 0);       // Left → 왼쪽에서
-                case 2: return new Vector2(-250f, 200f);    // TopLeft → 왼쪽 위에서
-                case 3: return new Vector2(0, 250f);        // Top → 위에서
-                case 4: return new Vector2(250f, 200f);     // TopRight → 오른쪽 위에서
-                case 5: return new Vector2(350f, 0);        // Right → 오른쪽에서
-                default: return new Vector2(0, 200f);
-            }
-        }
-
-        /// <summary>
-        /// 지정된 영역의 모든 Layout 관련 컴포넌트를 제거합니다.
-        /// enabled=false로 즉시 비활성화 + Destroy로 완전 제거를 병행합니다.
-        /// </summary>
-        private void DestroyAreaLayoutComponents(Transform area)
-        {
-            if (area == null) return;
-
-            // 모든 레이아웃 그룹 타입 처리 (DestroyImmediate로 즉시 제거)
-            var hlg = area.GetComponent<HorizontalLayoutGroup>();
-            if (hlg != null) { hlg.enabled = false; DestroyImmediate(hlg); }
-
-            var vlg = area.GetComponent<VerticalLayoutGroup>();
-            if (vlg != null) { vlg.enabled = false; DestroyImmediate(vlg); }
-
-            var glg = area.GetComponent<GridLayoutGroup>();
-            if (glg != null) { glg.enabled = false; DestroyImmediate(glg); }
-
-            var csf = area.GetComponent<ContentSizeFitter>();
-            if (csf != null) { csf.enabled = false; DestroyImmediate(csf); }
-        }
-
-        // ============================================================
-        // 손패 배치 — 프론트뷰 스타일 (3D 원근감은 부모 X회전으로 처리)
-        // ============================================================
-
-        /// <summary>
-        /// 손패 영역의 카드를 정갈한 가로 배치합니다.
-        /// 부모 Transform의 X축 회전이 3D 원근감을 처리합니다.
-        /// </summary>
-        private void RepositionHandCards()
-        {
-            int count = _handCardObjects.Count;
-            if (count == 0) return;
-
-            float cardWidth = 140f;
-            float cardHeight = 200f;
-            float overlap = -15f; // 카드 격치는 정도
-            float totalWidth = count * cardWidth + (count - 1) * overlap;
-            float startX = -totalWidth / 2f + cardWidth / 2f;
-
-            for (int i = 0; i < count; i++)
-            {
-                if (_handCardObjects[i] == null) continue;
-
-                // 호버 중인 카드는 건너뛰 — 호버 효과와 충돌 방지
-                var cardUI = _handCardObjects[i].GetComponent<CardUI>();
-                if (cardUI != null && cardUI.IsHovered) continue;
-
-                var rt = _handCardObjects[i].GetComponent<RectTransform>();
-                if (rt == null) continue;
-
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta = new Vector2(cardWidth, cardHeight);
-                rt.anchoredPosition = new Vector2(startX + i * (cardWidth + overlap), 0);
-                rt.localEulerAngles = Vector3.zero; // 개별 카드는 회전 없음 (부모 X회전이 3D 처리)
-
-                // 원본 위치 캐시 (호버 복원용)
-                if (cardUI != null)
-                {
-                    cardUI.CaptureOriginalPosition();
-                }
-            }
-        }
-
-        // ============================================================
-        // 트릭 영역 방사형 배치 — 플레이어 위치 기반
-        // ============================================================
-
-        /// <summary>
-        /// 트릭 영역의 카드를 플레이어 위치 기반으로 방사형 배치합니다.
-        /// 각 카드는 해당 플레이어의 방향에서 중앙으로 놓입니다.
-        /// </summary>
         private void RepositionTrickCards()
         {
             int count = _trickCardObjects.Count;
@@ -776,81 +678,270 @@ namespace SkullKing.UI
             for (int i = 0; i < count; i++)
             {
                 if (_trickCardObjects[i] == null) continue;
+                if (_customAnimatingCards.Contains(_trickCardObjects[i])) continue; // 애니메이션 중 건드림 방지
 
-                // 등장 애니메이션 중인 카드는 스킵
-                var cardUI = _trickCardObjects[i].GetComponent<CardUI>();
-                if (cardUI != null && cardUI.IsAnimating) continue;
+                // 겹쳐진 이전 카드의 색이나 프레임이 현재 카드의 투명 모서리로
+                // 비치지 않도록, 트릭이 쌓인 뒤에는 현재 1등 카드만 렌더링합니다.
+                bool isVisibleTopCard = _currentTopCardObj == null
+                    || _trickCardObjects[i] == _currentTopCardObj;
+                _trickCardObjects[i].SetActive(isVisibleTopCard);
+                if (!isVisibleTopCard) continue;
 
                 var rt = _trickCardObjects[i].GetComponent<RectTransform>();
-                if (rt == null) continue;
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    // 카드 원본 일러스트(832x1216)의 13:19 비율 유지
+                    rt.sizeDelta = new Vector2(120f, 120f * 19f / 13f);
 
-                // 카드를 낸 플레이어의 인덱스 얻기
-                int playerIndex = GetTrickCardPlayerIndex(i);
-                Vector2 pos = GetTrickCardPosition(playerIndex);
-
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta = new Vector2(120f, 170f);
-                rt.anchoredPosition = pos;
-
-                // 약간의 회전으로 자연스러운 느낌
-                float tiltAngle = (i - count / 2f) * 5f;
-                rt.localEulerAngles = new Vector3(0, 0, tiltAngle);
+                    // 모든 트릭 카드를 정확히 같은 위치에 겹칩니다.
+                    // 이전 카드의 빨강/검정 테두리가 위나 옆으로 삐져나오지 않습니다.
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localRotation = Quaternion.identity;
+                }
             }
         }
 
-        /// <summary>
-        /// 트릭 카드 인덱스에 해당하는 플레이어 인덱스를 반환합니다.
-        /// TrickCards 리스트에서 PlayerIndex를 추출합니다.
-        /// </summary>
-        private int GetTrickCardPlayerIndex(int trickCardIndex)
+        private void RepositionHandCards()
         {
-            if (_gameManager.State == null) return 0;
-            var trickCards = _gameManager.State.TrickCards;
-            if (trickCardIndex < trickCards.Count)
-                return trickCards[trickCardIndex].PlayerIndex;
-            return 0;
-        }
+            ArrangeCardsInArea(_playerHandArea, 70f, 1.5f, 2f);
 
-        /// <summary>
-        /// 플레이어 인덱스에 따른 트릭 카드 배치 좌표를 반환합니다.
-        /// 각 플레이어의 좌석 위치에서 중앙 방향으로 카드를 놓습니다.
-        /// </summary>
-        private Vector2 GetTrickCardPosition(int playerIndex)
-        {
-            int playerCount = _gameManager.State.Players.Length;
-            int seat = GetSeatSlot(playerIndex, playerCount);
-            float r = 85f; // 중앙에서의 거리
-
-            return seat switch
+            if (_opponentHandAreas != null)
             {
-                0 => new Vector2(0, -r),                 // Bottom (나)
-                1 => new Vector2(-r * 1.3f, -r * 0.2f),  // Left
-                2 => new Vector2(-r * 0.9f, r * 0.7f),   // TopLeft
-                3 => new Vector2(0, r),                   // Top
-                4 => new Vector2(r * 0.9f, r * 0.7f),    // TopRight
-                5 => new Vector2(r * 1.3f, -r * 0.2f),   // Right
-                _ => Vector2.zero
-            };
+                for (int i = 0; i < _opponentHandAreas.Length; i++)
+                {
+                    ArrangeCardsInArea(_opponentHandAreas[i], 25f, 0f, 0f);
+                }
+            }
+        }
+
+        private void ArrangeCardsInArea(Transform area, float spacing, float fanAngle, float yDrop)
+        {
+            if (area == null) return;
+
+            List<CardUI> validCards = new List<CardUI>();
+            for (int i = 0; i < area.childCount; i++)
+            {
+                var cardUI = area.GetChild(i).GetComponent<CardUI>();
+                if (cardUI != null && cardUI.gameObject.activeSelf)
+                {
+                    validCards.Add(cardUI);
+                }
+            }
+
+            int count = validCards.Count;
+            if (count == 0) return;
+
+            float totalWidth = (count - 1) * spacing;
+            float startX = -totalWidth / 2f;
+            float centerIndex = (count - 1) / 2f;
+
+            for (int i = 0; i < count; i++)
+            {
+                var cardUI = validCards[i];
+                if (cardUI.IsHovered) continue;
+
+                var rt = cardUI.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+
+                    float offsetFromCenter = i - centerIndex;
+                    float xPos = startX + (i * spacing);
+                    float yPos = Mathf.Abs(offsetFromCenter) * -yDrop;
+                    rt.anchoredPosition = new Vector2(xPos, yPos);
+
+                    float rotZ = offsetFromCenter * -fanAngle;
+                    rt.localRotation = Quaternion.Euler(0, 0, rotZ);
+                }
+                cardUI.CaptureOriginalPosition();
+            }
+        }
+
+        private void SpawnCardInTrickArea(PlayedCard playedCard)
+        {
+            EnqueuePresentation(() => PresentCard(playedCard));
+        }
+
+        private System.Collections.IEnumerator PresentCard(PlayedCard playedCard)
+        {
+            if (_cardPrefab == null || _trickArea == null) yield break;
+
+            var cardObj = Instantiate(_cardPrefab, _trickArea);
+            cardObj.transform.localScale = Vector3.one * 0.85f;
+            cardObj.transform.localRotation = Quaternion.identity;
+
+            var layoutElem = cardObj.GetComponent<LayoutElement>();
+            if (layoutElem != null) DestroyImmediate(layoutElem);
+
+            var cardUI = cardObj.GetComponent<CardUI>();
+            if (cardUI != null)
+            {
+                cardUI.Setup(playedCard.Card, false, this);
+                cardUI.SetOwnerLabel(_gameManager.State.Players[playedCard.PlayerIndex].Name);
+
+                if (playedCard.Card.Special == SpecialType.Tigress)
+                    cardUI.SetTigressMode(playedCard.TigressMode);
+
+                if (_spriteDatabase != null)
+                {
+                    cardUI.SetIllustration(_spriteDatabase.GetSpriteForCard(playedCard.Card));
+                    cardUI.SetComposedArtwork(_spriteDatabase.IsComposedArtwork(playedCard.Card));
+                }
+            }
+
+            _trickCardObjects.Add(cardObj);
+
+            // 1. 모든 카드는 정확히 같은 중앙 위치에 도착합니다.
+            Vector2 targetPos = Vector2.zero;
+
+            // 2. 출발지 계산
+            Vector2 startOffset = GetCardEntryOffset(playedCard.PlayerIndex);
+
+            // 3. 승패 판별 (UI가 1등인지 아닌지 체크)
+            _currentTrickCards.Add(playedCard);
+            if (_trickHistory != null)
+                _trickHistory.AddSubmitted(playedCard, _gameManager.State.Players[playedCard.PlayerIndex].Name);
+            int winnerIndex = TrickPresentationRules.WinnerCardIndex(_currentTrickCards);
+            GameObject winner = winnerIndex >= 0 ? _trickCardObjects[winnerIndex] : _currentTopCardObj;
+            bool whale = TrickPresentationRules.IsWhaleEntrance(_currentTrickCards);
+
+            // 4. 새로운 2단계 애니메이션 실행 (기존 PlayEntryAnimation 대신 이걸 씁니다)
+            yield return PlayTwoStepAnimation(cardObj, startOffset, targetPos, winner, whale);
+            _trickCardsDirty = true;
         }
 
         /// <summary>
-        /// 플레이어 인덱스를 화면 좌석 슬롯(0~5)으로 변환합니다.
-        /// 인간 플레이어는 항상 0(Bottom), 나머지는 시계방향.
+        /// 중앙으로 날아와 확대(뽐내기) 후, 승패에 따라 위/아래로 스르륵 겹쳐지는 애니메이션
         /// </summary>
-        private int GetSeatSlot(int playerIndex, int playerCount)
+        private System.Collections.IEnumerator PlayTwoStepAnimation(GameObject cardObj, Vector2 startPos, Vector2 finalPos, GameObject winner, bool whale)
         {
-            // UpdateScoreboard과 동일한 매핑
-            int[] mapping;
-            if (playerCount == 6) mapping = new int[] { 0, 1, 2, 3, 4, 5 };
-            else if (playerCount == 5) mapping = new int[] { 0, 1, 2, 4, 5 };
-            else if (playerCount == 4) mapping = new int[] { 0, 1, 3, 5 };
-            else if (playerCount == 3) mapping = new int[] { 0, 1, 5 };
-            else mapping = new int[] { 0, 3 };
+            _customAnimatingCards.Add(cardObj);
+            var rt = cardObj.GetComponent<RectTransform>();
 
-            return (playerIndex < mapping.Length) ? mapping[playerIndex] : 3;
+            float duration1 = 0.25f; // 중앙으로 날아오며 확대되는 시간
+            float pause = 0.5f;      // 중앙에서 카드를 뽐내며 대기하는 시간
+            float duration2 = 0.25f; // 승패에 따라 덱으로 들어가는 시간
+            _cardInputUnlockTime = Mathf.Max(
+                _cardInputUnlockTime, Time.time + duration1 + pause + duration2 + 0.15f);
+
+            Vector2 centerPos = new Vector2(0, 50f); // 뽐낼 위치 (중앙에서 살짝 위)
+            Vector3 startScale = Vector3.one * 0.5f;
+            Vector3 bigScale = Vector3.one * 1.3f; // 1.3배 확대
+            Vector3 finalScale = Vector3.one * 0.85f; // 덱에 쌓이는 최종 스케일
+
+            rt.anchoredPosition = startPos;
+            rt.localScale = startScale;
+
+            // 1단계: 이름표에서 정중앙으로 날아오면서 커짐
+            rt.SetAsLastSibling(); // 날아올 때는 무조건 맨 위에서 당당하게!
+            float elapsed = 0f;
+            while (elapsed < duration1)
+            {
+                if (cardObj == null) yield break;
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration1;
+                float ease = 1f - Mathf.Pow(1f - t, 3f);
+
+                rt.anchoredPosition = Vector2.Lerp(startPos, centerPos, ease);
+                rt.localScale = Vector3.Lerp(startScale, bigScale, ease);
+                yield return null;
+            }
+            rt.anchoredPosition = centerPos;
+            rt.localScale = bigScale;
+
+            // 2단계: 중앙에서 카드 뽐내며 잠시 대기
+            yield return new WaitForSeconds(pause);
+
+            if (whale)
+            {
+                // Show the celestial card's actual submission first. Keep it visible at the
+                // showcase position until white light hides the swap; never change leader early.
+                System.Action swap = () =>
+                {
+                    if (cardObj != null)
+                    {
+                        rt.anchoredPosition = finalPos;
+                        rt.localScale = finalScale;
+                        _customAnimatingCards.Remove(cardObj);
+                    }
+                    ApplyPresentedWinner(winner);
+                };
+                if (_whaleWingTransition != null) yield return _whaleWingTransition.Play(swap, rt,
+                    _trickArea as RectTransform, finalPos,
+                    _currentTopCardObj != null ? _currentTopCardObj.GetComponent<RectTransform>() : null,
+                    winner != null ? winner.GetComponent<RectTransform>() : null);
+                else swap();
+                _customAnimatingCards.Remove(cardObj);
+                _cardInputUnlockTime = Mathf.Max(_cardInputUnlockTime, Time.time + .15f);
+                RepositionTrickCards();
+                yield break;
+            }
+
+            // 3단계 진입 전: ★★★ 승패에 따라 쌓이는 순서(Z-Order) 마술 부리기 ★★★
+            if (winner != null)
+            {
+                _currentTopCardObj = winner;
+                winner.SetActive(true);
+                winner.transform.SetAsLastSibling();
+            }
+            else
+            {
+                // 지는 카드라면? 현재 1등 카드의 Z축 순서를 복사해옴!
+                // 이렇게 하면 1등 카드가 자동으로 밀려 올라가면서, 내 카드가 그 밑으로 깔리게 됨
+                if (_currentTopCardObj != null)
+                {
+                    int topIndex = _currentTopCardObj.transform.GetSiblingIndex();
+                    rt.SetSiblingIndex(topIndex);
+                }
+            }
+
+            // 3단계: 스르륵 덱에 겹치기 (이때 지는 카드는 1등 카드 뒤로 숨어 들어가는 것처럼 보임!)
+            UpdateTrickHistoryLeader();
+            elapsed = 0f;
+            while (elapsed < duration2)
+            {
+                if (cardObj == null) yield break;
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration2;
+
+                rt.anchoredPosition = Vector2.Lerp(centerPos, finalPos, t);
+                rt.localScale = Vector3.Lerp(bigScale, finalScale, t);
+                yield return null;
+            }
+            rt.anchoredPosition = finalPos;
+            rt.localScale = finalScale;
+
+            _customAnimatingCards.Remove(cardObj);
+            _cardInputUnlockTime = Mathf.Max(_cardInputUnlockTime, Time.time + 0.15f);
+            RepositionTrickCards();
         }
+
+        private Vector2 GetCardEntryOffset(int playerIndex)
+        {
+            if (playerIndex == 0)
+            {
+                return new Vector2(0f, -450f);
+            }
+
+            if (playerIndex > 0 && playerIndex < _playerInfoTexts.Length)
+            {
+                if (_playerInfoTexts[playerIndex] != null)
+                {
+                    var panelRect = _playerInfoTexts[playerIndex].transform.parent.GetComponent<RectTransform>();
+                    if (panelRect != null && panelRect.gameObject.activeSelf)
+                    {
+                        return panelRect.anchoredPosition;
+                    }
+                }
+            }
+            return new Vector2(0f, -450f);
+        }
+
 
         private bool IsCardPlayable(CardData card)
         {
@@ -864,17 +955,14 @@ namespace SkullKing.UI
         // ============================================================
         // 유틸리티
         // ============================================================
-
         private void SetText(Text textComponent, string value)
         {
-            if (textComponent != null)
-                textComponent.text = value;
+            if (textComponent != null) textComponent.text = value;
         }
 
         private void SetActive(GameObject obj, bool active)
         {
-            if (obj != null)
-                obj.SetActive(active);
+            if (obj != null) obj.SetActive(active);
         }
 
         private string GetPhaseDisplayName(GamePhase phase)
@@ -891,187 +979,5 @@ namespace SkullKing.UI
                 _ => phase.ToString()
             };
         }
-
-        // ============================================================
-        // 3D 원근 캔버스 설정 — "정면에서 보는 카드" 느낌의 핵심
-        // ============================================================
-
-        /// <summary>
-        /// Canvas를 Screen Space - Camera 모드로 전환하여
-        /// 3D 회전에 원근감(perspective)이 적용되도록 합니다.
-        /// </summary>
-        private void SetupPerspectiveCanvas()
-        {
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
-            if (canvas == null) return;
-
-            Camera cam = Camera.main;
-            if (cam == null) return;
-
-            // Canvas를 카메라 기반 렌더링으로 전환
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = cam;
-            canvas.planeDistance = 100f;
-
-            // 카메라 원근 투영 확인
-            cam.orthographic = false;
-            cam.fieldOfView = 60f;
-
-            Debug.Log("[FrontView] Canvas -> Screen Space - Camera (원근 투영 활성화)");
-
-            // 손패 영역: 약한 X축 회전 (강하면 카드가 너무 누워보임)
-            if (_playerHandArea != null)
-            {
-                _playerHandArea.localEulerAngles = new Vector3(3f, 0f, 0f);
-            }
-
-            // 트릭 영역: X축 회전으로 테이블 면 원근감
-            if (_trickArea != null)
-            {
-                _trickArea.localEulerAngles = new Vector3(35f, 0f, 0f);
-            }
-        }
-
-        // ============================================================
-        // 프론트뷰 동적 UI 생성 및 관리
-        // ============================================================
-
-        /// <summary>
-        /// 프론트뷰 UI 요소들을 런타임에 동적으로 생성합니다.
-        /// 첫 라운드 시작 시 한 번만 호출됩니다.
-        /// </summary>
-        private void SetupFrontViewLayout()
-        {
-            if (_frontViewInitialized) return;
-            if (_gameManager.State == null) return;
-
-            int playerCount = _gameManager.State.Players.Length;
-            var players = _gameManager.State.Players;
-
-            // ★ Canvas를 3D 원근 모드로 전환 (핵심!)
-            SetupPerspectiveCanvas();
-
-            // Canvas 찾기 (프로필 패널/상대 카드를 배치할 부모)
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
-            if (canvas == null)
-            {
-                Debug.LogWarning("[FrontView] Canvas를 찾을 수 없습니다!");
-                return;
-            }
-
-            Transform canvasTransform = canvas.transform;
-
-            // ---- 상대 카드 뒷면 표시 생성 (3D 회전 적용!) ----
-            var opponentList = new List<OpponentHandDisplay>();
-            for (int i = 0; i < playerCount; i++)
-            {
-                if (players[i].IsHuman) continue;
-
-                int seat = GetSeatSlot(i, playerCount);
-                Vector2 opponentAnchor = GetOpponentHandAnchor(seat);
-
-                var handObj = new GameObject($"OpponentHand_{players[i].Name}");
-                handObj.transform.SetParent(canvasTransform, false);
-
-                var rt = handObj.AddComponent<RectTransform>();
-                rt.anchorMin = opponentAnchor;
-                rt.anchorMax = opponentAnchor;
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta = new Vector2(300f, 150f);
-
-                // ★ 좌석별 3D 회전 적용 — 상대 카드도 프론트뷰!
-                Vector3 seatRotation = GetOpponentHandRotation(seat);
-                rt.localEulerAngles = seatRotation;
-
-                var display = handObj.AddComponent<OpponentHandDisplay>();
-                display.Setup(seat, players[i].Hand.Count);
-
-                opponentList.Add(display);
-            }
-            _opponentDisplays = opponentList.ToArray();
-
-            _frontViewInitialized = true;
-            Debug.Log($"[FrontView] 프론트뷰 UI 초기화 완료 ({playerCount}명)");
-        }
-
-        /// <summary>
-        /// 좌석 슬롯에 따른 상대 카드 뒷면 표시 앵커 위치를 반환합니다.
-        /// </summary>
-        private Vector2 GetOpponentHandAnchor(int seat)
-        {
-            return seat switch
-            {
-                1 => new Vector2(0.10f, 0.45f),   // Left
-                2 => new Vector2(0.15f, 0.75f),   // TopLeft
-                3 => new Vector2(0.50f, 0.82f),   // Top
-                4 => new Vector2(0.85f, 0.75f),   // TopRight
-                5 => new Vector2(0.90f, 0.45f),   // Right
-                _ => new Vector2(0.5f, 0.5f)
-            };
-        }
-
-        /// <summary>
-        /// 좌석 슬롯에 따른 상대 카드 컨테이너 회전을 반환합니다.
-        /// Z축 회전만 사용하여 부채꼴 방향을 전환합니다.
-        /// (3D X/Y 회전은 원근 Canvas에서 심하게 왜곡되므로 사용하지 않음)
-        /// </summary>
-        private Vector3 GetOpponentHandRotation(int seat)
-        {
-            return seat switch
-            {
-                1 => new Vector3(0f, 0f, -90f),    // Left: 세로 (아래를 향함)
-                2 => new Vector3(0f, 0f, -35f),    // TopLeft: 대각
-                3 => Vector3.zero,                  // Top: 가로 (기본)
-                4 => new Vector3(0f, 0f, 35f),     // TopRight: 대각 반대
-                5 => new Vector3(0f, 0f, 90f),     // Right: 세로 (아래를 향함)
-                _ => Vector3.zero
-            };
-        }
-
-        /// <summary>
-        /// 모든 프로필 패널의 정보를 갱신합니다.
-        /// </summary>
-        private void UpdateProfilePanels()
-        {
-            if (_profilePanels == null || _gameManager.State == null) return;
-
-            for (int i = 0; i < _profilePanels.Length; i++)
-            {
-                if (_profilePanels[i] == null) continue;
-                var p = _gameManager.State.Players[i];
-
-                _profilePanels[i].UpdateInfo(
-                    p.Bid,
-                    p.TricksWon,
-                    p.TotalScore,
-                    p.Hand.Count,
-                    p.HasBid,
-                    i == _gameManager.State.CurrentPlayerIndex
-                );
-            }
-        }
-
-        /// <summary>
-        /// 상대 플레이어의 카드 뒷면 표시를 갱신합니다.
-        /// </summary>
-        private void RefreshOpponentHands()
-        {
-            if (_opponentDisplays == null || _gameManager.State == null) return;
-
-            int displayIdx = 0;
-            for (int i = 0; i < _gameManager.State.Players.Length; i++)
-            {
-                if (_gameManager.State.Players[i].IsHuman) continue;
-                if (displayIdx >= _opponentDisplays.Length) break;
-
-                _opponentDisplays[displayIdx].SetCardCount(
-                    _gameManager.State.Players[i].Hand.Count
-                );
-                displayIdx++;
-            }
-        }
     }
 }
-

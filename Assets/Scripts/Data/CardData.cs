@@ -145,6 +145,7 @@ namespace SkullKing.Data
     /// 트릭에 제출된 카드 한 장의 정보.
     /// 누가 어떤 카드를 어떤 옵션으로 냈는지를 기록합니다.
     /// </summary>
+    [Serializable]
     public struct PlayedCard
     {
         /// <summary>제출한 플레이어의 인덱스</summary>

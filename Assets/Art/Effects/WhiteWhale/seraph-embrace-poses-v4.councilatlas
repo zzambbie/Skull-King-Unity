@@ -1,0 +1,11 @@
+{
+  "texture": "Assets/Art/Effects/WhiteWhale/seraph-embrace-poses-v4.png",
+  "pieces": [
+    { "name": "Embrace00", "x": 0, "y": 0, "width": 512, "height": 512 },
+    { "name": "Embrace01", "x": 512, "y": 0, "width": 512, "height": 512 },
+    { "name": "Embrace02", "x": 1024, "y": 0, "width": 512, "height": 512 },
+    { "name": "Embrace03", "x": 0, "y": 512, "width": 512, "height": 512 },
+    { "name": "Embrace04", "x": 512, "y": 512, "width": 512, "height": 512 },
+    { "name": "Embrace05", "x": 1024, "y": 512, "width": 512, "height": 512 }
+  ]
+}
